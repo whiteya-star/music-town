@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no,maximum-scale=1.0">
+<title>뮤직 마을</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;}
+body{background:#5A9AC0;transition:background .7s;}
+
+/* NAV */
+#nav{position:fixed;bottom:0;left:0;right:0;height:52px;display:flex;z-index:200;background:rgba(0,0,0,0.55);backdrop-filter:blur(8px);}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:rgba(255,255,255,0.5);font-size:0.7rem;cursor:pointer;border:none;background:none;gap:1px;transition:all .2s;}
+.tab.on{color:#FFD700;}
+.tabi{font-size:1.3rem;line-height:1;}.tabl{font-size:0.58rem;}
+
+/* PAGES */
+.page{position:fixed;top:0;left:0;right:0;bottom:52px;display:none;flex-direction:column;overflow:hidden;}
+.page.on{display:flex;}
+
+/* ════════════════════════ PAGE 1: MUSIC TOWN ════════════════════════ */
+#p1{padding:4px;gap:3px;background:transparent;}
+
+/* Season tabs */
+.sbar{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;flex-shrink:0;}
+.sbtn{padding:3px 7px;border-radius:12px;border:2px solid transparent;background:rgba(255,255,255,0.18);color:#fff;font-size:0.68rem;cursor:pointer;transition:all .2s;touch-action:manipulation;}
+.sbtn.on{border-color:#fff;background:rgba(255,255,255,0.38);font-weight:700;}
+
+/* FREE CANVAS */
+#canvas-wrap{
+  position:relative;flex:1;border-radius:14px;overflow:hidden;
+  box-shadow:0 4px 20px rgba(0,0,0,0.35);min-height:0;touch-action:none;
+}
+#bg-canvas{position:absolute;top:0;left:0;width:100%;height:100%;}
+#obj-layer{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;}
+#trav-layer{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:8;}
+#hit-layer{position:absolute;top:0;left:0;width:100%;height:100%;z-index:6;cursor:crosshair;}
+
+/* Pitch gradient guide on left */
+#pitch-guide{
+  position:absolute;left:0;top:0;width:28px;height:100%;z-index:5;
+  pointer-events:none;
+  background:linear-gradient(180deg,
+    rgba(255,220,100,0.35) 0%,
+    rgba(100,220,255,0.18) 50%,
+    rgba(80,80,255,0.28) 100%);
+  display:flex;flex-direction:column;justify-content:space-around;align-items:center;
+}
+.pitch-tick{font-size:0.38rem;color:rgba(255,255,255,0.6);writing-mode:horizontal-tb;}
+
+/* Objects on canvas */
+.cobj{
+  position:absolute;transform:translate(-50%,-50%);
+  display:flex;flex-direction:column;align-items:center;
+  pointer-events:all;cursor:pointer;z-index:7;
+  transition:filter .12s, transform .1s;
+}
+.cobj-inner{
+  width:44px;height:44px;border-radius:50%;
+  background:rgba(255,255,255,0.88);
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.35rem;
+  box-shadow:0 3px 10px rgba(0,0,0,0.28);
+  border:2.5px solid rgba(255,255,255,0.9);
+  transition:transform .1s,filter .1s;
+}
+.cobj.sel .cobj-inner{border-color:#FFD700;transform:scale(1.15);}
+.cobj.lit .cobj-inner{
+  filter:brightness(1.4) drop-shadow(0 0 8px rgba(255,255,80,0.9));
+  transform:scale(1.22);
+}
+.cobj-note{
+  font-size:0.45rem;color:#fff;
+  background:rgba(0,0,0,0.55);
+  padding:1px 4px;border-radius:5px;
+  margin-top:2px;white-space:nowrap;
+}
+
+/* Travelers */
+.trav-el{
+  position:absolute;transform:translate(-50%,-50%);
+  font-size:1.7rem;line-height:1;
+  pointer-events:none;z-index:9;
+  filter:drop-shadow(0 2px 5px rgba(0,0,0,0.45));
+  transition:filter .1s;
+}
+.trav-el.lit{filter:drop-shadow(0 0 10px rgba(255,255,80,0.95)) drop-shadow(0 2px 5px rgba(0,0,0,0.45));}
+
+/* ── TRAVELER LAUNCH PANEL ─────────────────── */
+#launch-panel{
+  flex-shrink:0;
+  background:rgba(0,0,0,0.25);
+  border-radius:10px;
+  padding:4px 5px;
+}
+.lp-hint{font-size:0.58rem;color:rgba(255,255,255,0.65);text-align:center;margin-bottom:3px;}
+.lp-row{display:flex;gap:4px;justify-content:center;}
+.lbtn{
+  width:42px;height:52px;border-radius:10px;
+  border:2.5px solid rgba(255,255,255,0.2);
+  background:rgba(255,255,255,0.08);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;touch-action:manipulation;
+  transition:all .2s;position:relative;overflow:hidden;gap:1px;
+}
+.lbtn .lico{font-size:1.4rem;line-height:1;transition:transform .15s;}
+.lbtn .lnote{font-size:0.45rem;color:rgba(255,255,255,0.55);}
+.lbtn .lstatus{font-size:0.48rem;color:rgba(255,255,255,0.4);}
+/* Active state */
+.lbtn.on{
+  border-color:#A8FF60;
+  background:rgba(80,200,50,0.25);
+  box-shadow:0 0 12px rgba(120,255,60,0.45);
+}
+.lbtn.on .lstatus{color:#A8FF60;}
+.lbtn.on .lico{transform:scale(1.1);}
+/* Countdown ripple */
+.lbtn.counting{animation:countpulse .3s ease-out 3;}
+@keyframes countpulse{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
+/* GO flash */
+.lbtn .go-flash{
+  position:absolute;top:0;left:0;right:0;bottom:0;
+  background:rgba(160,255,80,0.4);border-radius:8px;
+  opacity:0;pointer-events:none;
+}
+.lbtn.go-animate .go-flash{animation:goflash .35s ease-out forwards;}
+@keyframes goflash{0%{opacity:1}100%{opacity:0}}
+
+/* Object picker */
+.pal{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;background:rgba(0,0,0,0.18);border-radius:9px;padding:4px;flex-shrink:0;}
+.ob{padding:3px 4px;border-radius:8px;border:2px solid transparent;background:rgba(255,255,255,0.1);color:#fff;cursor:pointer;text-align:center;min-width:40px;touch-action:manipulation;}
+.ob.on{border-color:#fff;background:rgba(255,255,255,0.28);}
+.obico{font-size:1.15rem;}.oblbl{font-size:0.55rem;margin-top:1px;}
+
+/* Controls row */
+.ctrls{display:flex;gap:4px;justify-content:center;align-items:center;flex-wrap:wrap;flex-shrink:0;}
+.pbtn{padding:7px 15px;border-radius:16px;border:none;color:#fff;font-size:0.82rem;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.3);touch-action:manipulation;}
+.pbtn.go{background:#27AE60;}.pbtn.st{background:#E74C3C;}
+.tw{display:flex;align-items:center;gap:3px;color:#fff;font-size:0.65rem;}
+.tw input{width:56px;accent-color:#fff;}
+.cb{padding:5px 8px;border-radius:11px;border:1.5px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.12);color:#fff;cursor:pointer;font-size:0.68rem;touch-action:manipulation;}
+
+/* Note picker popup */
+#npop{
+  display:none;position:absolute;z-index:20;
+  background:rgba(0,0,0,0.82);border-radius:12px;padding:8px;
+  backdrop-filter:blur(6px);box-shadow:0 4px 20px rgba(0,0,0,0.6);
+  flex-direction:column;gap:5px;min-width:200px;
+}
+#npop.show{display:flex;}
+.np-title{color:#FFD700;font-size:0.76rem;font-weight:700;text-align:center;}
+.np-btns{display:flex;gap:3px;flex-wrap:wrap;justify-content:center;}
+.npb{padding:5px 8px;border-radius:7px;border:none;background:rgba(255,255,255,0.16);color:#fff;font-size:0.76rem;font-weight:700;cursor:pointer;touch-action:manipulation;}
+.npb.on{background:#FFD700;color:#333;}
+.np-acts{display:flex;gap:4px;justify-content:center;}
+.np-del{padding:4px 10px;border-radius:7px;border:none;background:rgba(220,60,60,0.4);color:#fff;font-size:0.7rem;cursor:pointer;}
+.np-cls{padding:4px 10px;border-radius:7px;border:none;background:rgba(255,255,255,0.2);color:#fff;font-size:0.7rem;cursor:pointer;}
+.stag{font-size:0.58rem;color:#fff;background:rgba(255,255,255,0.2);padding:2px 6px;border-radius:7px;text-align:center;width:100%;}
+
+/* ════════════════════════ PAGE 2 ════════════════════════ */
+#p2{background:linear-gradient(180deg,#0d1f35 0%,#1a3a5c 100%);padding:7px;gap:5px;}
+.clm-h{text-align:center;color:#FFD700;font-size:1.05rem;font-weight:700;text-shadow:0 2px 4px rgba(0,0,0,0.6);flex-shrink:0;}
+.clm-h span{font-size:0.66rem;color:rgba(255,255,255,0.62);display:block;font-weight:400;}
+#clm-scene{position:relative;flex:1;border-radius:11px;overflow:hidden;min-height:0;box-shadow:0 4px 20px rgba(0,0,0,0.5);}
+#cscene-svg{position:absolute;top:0;left:0;width:100%;height:100%;}
+.stat-row{display:flex;gap:4px;flex-shrink:0;}
+.sc{flex:1;background:rgba(0,0,0,0.4);border-radius:9px;padding:5px 3px;text-align:center;border:1px solid rgba(255,255,255,0.1);}
+.sv{font-size:1.0rem;font-weight:700;color:#FFD700;}.sl{font-size:0.53rem;color:rgba(255,255,255,0.62);}
+.yr-w{background:rgba(0,0,0,0.28);border-radius:9px;padding:6px 9px;flex-shrink:0;}
+.yr-t{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;}
+.yr-l{color:#fff;font-size:0.68rem;}#yrv{color:#FFD700;font-size:0.95rem;font-weight:700;}
+#yrs{width:100%;accent-color:#FFD700;height:5px;}
+.yr-m{display:flex;justify-content:space-between;font-size:0.5rem;color:rgba(255,255,255,0.42);margin-top:2px;}
+.cmp-btn{padding:6px;border-radius:9px;border:1.5px solid rgba(255,200,0,0.45);background:rgba(255,200,0,0.12);color:#FFD700;cursor:pointer;font-size:0.7rem;flex-shrink:0;text-align:center;font-weight:600;}
+#cpanel{display:none;position:fixed;top:0;left:0;right:0;bottom:52px;background:rgba(0,0,15,0.95);z-index:50;flex-direction:column;padding:8px;gap:5px;}
+#cpanel.show{display:flex;}
+.cmp-row{display:flex;gap:5px;flex:1;}
+.cmp-card{flex:1;border-radius:11px;overflow:hidden;display:flex;flex-direction:column;}
+.cmp-top{padding:5px;text-align:center;font-size:0.68rem;font-weight:700;color:#fff;}
+.cmp-sv{flex:1;}.cmp-sv svg{width:100%;height:100%;}
+.cmp-cls{padding:7px;border-radius:9px;background:rgba(255,255,255,0.15);border:none;color:#fff;cursor:pointer;font-size:0.75rem;flex-shrink:0;text-align:center;}
+
+/* ════════════════════════ PAGE 3 ════════════════════════ */
+#p3{background:linear-gradient(180deg,#0d2a18 0%,#051508 100%);padding:7px;gap:5px;overflow-y:auto;}
+.eh{text-align:center;flex-shrink:0;font-size:2rem;line-height:1;}
+.eco-score{background:rgba(0,0,0,0.3);border-radius:11px;padding:7px;flex-shrink:0;}
+.hearts{display:flex;gap:3px;justify-content:center;margin-bottom:5px;flex-wrap:wrap;}
+.heart{font-size:1.55rem;transition:all .3s;}
+.earth-row{display:flex;justify-content:center;gap:8px;align-items:center;}
+.earth-stage{font-size:2.2rem;transition:all .35s;}
+.temp-bar-w{flex:1;background:rgba(0,0,0,0.3);border-radius:6px;height:12px;overflow:hidden;position:relative;}
+.temp-bar{height:100%;background:linear-gradient(90deg,#27AE60,#A8E060);border-radius:6px;transition:width .5s;position:absolute;left:0;}
+.eco-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;flex-shrink:0;}
+.ecard{background:rgba(255,255,255,0.06);border:2.5px solid rgba(255,255,255,0.12);border-radius:12px;padding:7px 3px;cursor:pointer;transition:all .22s;display:flex;flex-direction:column;align-items:center;gap:3px;position:relative;touch-action:manipulation;}
+.ecard.pledged{background:rgba(39,174,96,0.22);border-color:#27AE60;box-shadow:0 0 12px rgba(39,174,96,0.35);}
+.eico{font-size:1.85rem;line-height:1;}
+.elbl{font-size:0.58rem;color:rgba(255,255,255,0.8);font-weight:600;text-align:center;line-height:1.2;}
+.ebar-w{width:100%;background:rgba(0,0,0,0.3);border-radius:4px;height:4px;overflow:hidden;}
+.ebar{height:100%;background:#A8E060;border-radius:4px;transition:width .4s;}
+.echk{position:absolute;top:3px;right:4px;font-size:0.85rem;opacity:0;transition:opacity .2s;}
+.ecard.pledged .echk{opacity:1;}
+.mg-t{color:#FFD700;font-size:0.76rem;font-weight:700;text-align:center;flex-shrink:0;}
+.mg-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;flex-shrink:0;}
+.mc{background:rgba(0,0,0,0.28);border:2px solid rgba(255,255,255,0.18);border-radius:9px;padding:7px 4px;cursor:pointer;text-align:center;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:52px;justify-content:center;touch-action:manipulation;}
+.mc-ico{font-size:1.55rem;}.mc-txt{font-size:0.6rem;color:rgba(255,255,255,0.7);}
+.mc.sel{border-color:#FFD700;background:rgba(255,215,0,0.15);}
+.mc.ok{border-color:#27AE60;background:rgba(39,174,96,0.22);pointer-events:none;}
+.mc.no{border-color:#E74C3C;background:rgba(231,76,60,0.18);}
+.mg-result{text-align:center;font-size:0.72rem;color:rgba(255,255,255,0.7);min-height:18px;flex-shrink:0;}
+</style>
+</head>
+<body>
+
+<!-- ══ PAGE 1: MUSIC TOWN ══ -->
+<div class="page on" id="p1">
+  <div class="sbar" id="sbar"></div>
+
+  <!-- FREE CANVAS -->
+  <div id="canvas-wrap">
+    <canvas id="bg-canvas"></canvas>
+    <div id="pitch-guide" id="pitch-guide"></div>
+    <div id="obj-layer"></div>
+    <div id="trav-layer"></div>
+    <!-- Note popup -->
+    <div id="npop">
+      <div class="np-title" id="np-title">&#127925; 음 선택</div>
+      <div class="np-btns" id="np-btns"></div>
+      <div class="np-acts">
+        <button class="np-del" onclick="deleteSel()">&#128465; 삭제</button>
+        <button class="np-cls" onclick="closeNpop()">&#10005; 닫기</button>
+      </div>
+    </div>
+    <div id="hit-layer"></div>
+  </div>
+
+  <!-- TRAVELER LAUNCH PANEL -->
+  <div id="launch-panel">
+    <div class="lp-hint">&#127381; 캐릭터 버튼을 터치하면 마을에서 출발해요! 각자 다른 타이밍에 눌러보세요</div>
+    <div class="lp-row" id="lp-row"></div>
+  </div>
+
+  <!-- OBJECT PALETTE -->
+  <div class="pal" id="pal"></div>
+
+  <!-- CONTROLS -->
+  <div class="ctrls">
+    <button class="pbtn go" id="pbtn" onclick="togglePlay()">&#9654; 연주!</button>
+    <div class="tw">&#128034;<input type="range" min="40" max="180" value="90" id="tempo" step="1" oninput="onTempo(this.value)">&#128007;<span id="tval">90</span></div>
+    <button class="cb" onclick="loadDemo()">&#127932; 예시</button>
+    <button class="cb" onclick="clearAll()">&#128465; 초기화</button>
+  </div>
+</div>
+
+<!-- ══ PAGE 2: CLIMATE ══ -->
+<div class="page" id="p2">
+  <div class="clm-h">&#127757; 기후변화 탐험<span>연도 슬라이더를 움직여 지구의 변화를 확인해요</span></div>
+  <div id="clm-scene"><svg id="cscene-svg" viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice"></svg></div>
+  <div class="stat-row">
+    <div class="sc"><div class="sv" id="co2v">280</div><div class="sl">CO&#8322; ppm</div></div>
+    <div class="sc"><div class="sv" id="tempv">+0.0&#176;</div><div class="sl">&#127777; 기온</div></div>
+    <div class="sc"><div class="sv" id="seav">+0cm</div><div class="sl">&#127754; 해수면</div></div>
+    <div class="sc"><div class="sv" id="icepct">100%</div><div class="sl">&#129504; 빙하</div></div>
+  </div>
+  <div class="yr-w">
+    <div class="yr-t"><span class="yr-l">&#128337; 연도</span><span id="yrv">1750년</span></div>
+    <input type="range" min="1750" max="2100" value="1750" id="yrs" oninput="updateClimate(this.value)">
+    <div class="yr-m"><span>1750</span><span>비발디(1725)</span><span>현재</span><span>2100</span></div>
+  </div>
+  <button class="cmp-btn" onclick="showCmp()">&#9835; 비발디의 봄 vs 2050년의 봄 비교하기</button>
+</div>
+<div id="cpanel">
+  <div style="text-align:center;color:#FFD700;font-size:0.9rem;font-weight:700;">&#9835; 봄의 변화</div>
+  <div class="cmp-row">
+    <div class="cmp-card" style="background:linear-gradient(180deg,#87CEEB,#90EE90);">
+      <div class="cmp-top" style="background:rgba(0,80,0,0.5);">&#9834; 1725년의 봄</div>
+      <div class="cmp-sv"><svg viewBox="0 0 200 150" id="c1svg"></svg></div>
+    </div>
+    <div class="cmp-card" style="background:linear-gradient(180deg,#B87030,#7A3818);">
+      <div class="cmp-top" style="background:rgba(80,0,0,0.5);">&#9888;&#65039; 2050년의 봄</div>
+      <div class="cmp-sv"><svg viewBox="0 0 200 150" id="c2svg"></svg></div>
+    </div>
+  </div>
+  <button class="cmp-cls" onclick="hideCmp()">&#10005; 닫기</button>
+</div>
+
+<!-- ══ PAGE 3: ECO ══ -->
+<div class="page" id="p3">
+  <div class="eh">&#127757;</div>
+  <div class="eco-score">
+    <div class="hearts" id="hearts"></div>
+    <div class="earth-row">
+      <span class="earth-stage" id="earthstage">&#128577;</span>
+      <div class="temp-bar-w"><div class="temp-bar" id="tempbar" style="width:0%"></div></div>
+      <span style="color:rgba(255,255,255,0.7);font-size:0.65rem;" id="temptxt">0%</span>
+    </div>
+  </div>
+  <div class="eco-grid" id="ecogrid"></div>
+  <div class="mg-t">&#9733; 맞춰보세요!</div>
+  <div class="mg-grid" id="mggrid"></div>
+  <div class="mg-result" id="mgresult"></div>
+</div>
+
+<!-- NAV -->
+<div id="nav">
+  <button class="tab on" onclick="showPage('p1',this)"><span class="tabi">&#127968;</span><span class="tabl">뮤직 마을</span></button>
+  <button class="tab" onclick="showPage('p2',this)"><span class="tabi">&#127775;</span><span class="tabl">기후변화</span></button>
+  <button class="tab" onclick="showPage('p3',this)"><span class="tabi">&#127757;</span><span class="tabl">지구 지키기</span></button>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// SHARED
+// ══════════════════════════════════════════
+function showPage(id,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.getElementById(id).classList.add('on');
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  if(btn)btn.classList.add('on');
+  const bgs={p1:SE[season].bg,p2:'#0d1f35',p3:'#0d2a18'};
+  document.body.style.background=bgs[id]||'#333';
+}
+
+// ══════════════════════════════════════════
+// PAGE 1 — MUSIC TOWN
+// ══════════════════════════════════════════
+const SE={
+  spring:{label:'&#127800; 봄', notes:[60,62,64,67,69,72,74,76], names:['도','레','미','솔','라','도↑','레↑','미↑'], bg:'#5A9AC0',
+    travs:['&#128038;','&#129419;','&#127804;','&#129420;','&#128029;','&#127836;','&#127993;','&#128105;']},
+  summer:{label:'&#9728; 여름',notes:[55,57,59,62,64,67,69,71],names:['솔↓','라↓','시↓','레','미','솔','라','시'],bg:'#C09820',
+    travs:['&#128029;','&#9728;','&#127803;','&#127817;','&#128032;','&#127755;','&#128116;','&#128104;']},
+  autumn:{label:'&#127810; 가을',notes:[57,60,62,64,67,69,72,74],names:['라↓','도','레','미','솔','라','도↑','레↑'],bg:'#9A5820',
+    travs:['&#127810;','&#129436;','&#127812;','&#127792;','&#129420;','&#127822;','&#128115;','&#128106;']},
+  winter:{label:'&#10052; 겨울',notes:[62,64,65,67,69,70,72,74],names:['레','미','파','솔','라','시♭','도↑','레↑'],bg:'#5878A0',
+    travs:['&#9924;','&#10052;','&#127784;','&#128169;','&#9913;','&#127967;','&#128113;','&#128107;']},
+  keys: {label:'&#127929; 건반',notes:[60,61,62,63,64,65,66,67],names:['도','도♯','레','레♯','미','파','파♯','솔'],bg:'#6848A8',
+    travs:['&#127925;','&#127926;','&#9835;','&#127927;','&#127928;','&#127929;','&#128112;','&#128108;']}
+};
+
+const AO={
+  // 🌱 Nature
+  flower:   {ico:'&#127800;',lbl:'꽃',    cat:'nature',fx:'bright'},
+  tree:     {ico:'&#127794;',lbl:'나무',  cat:'nature',fx:'default'},
+  cherry:   {ico:'&#127802;',lbl:'벚꽃',  cat:'nature',fx:'bright'},
+  sprout:   {ico:'&#127793;',lbl:'새싹',  cat:'nature',fx:'soft'},
+  sunflower:{ico:'&#127803;',lbl:'해바라기',cat:'nature',fx:'default'},
+  leaf:     {ico:'&#127810;',lbl:'낙엽',  cat:'nature',fx:'soft'},
+  mushroom: {ico:'&#127812;',lbl:'버섯',  cat:'nature',fx:'default'},
+  snowflake:{ico:'&#10052;', lbl:'눈송이',cat:'nature',fx:'snow'},
+  // 🐾 Creatures
+  bird:     {ico:'&#128038;',lbl:'새',    cat:'creature',fx:'bird'},
+  butterfly:{ico:'&#129419;',lbl:'나비',  cat:'creature',fx:'bright'},
+  bee:      {ico:'&#128029;',lbl:'벌',    cat:'creature',fx:'buzz'},
+  frog:     {ico:'&#128056;',lbl:'개구리',cat:'creature',fx:'soft'},
+  // 🏡 Buildings & Things
+  house:    {ico:'&#127968;',lbl:'집',    cat:'build',fx:'default'},
+  lamp:     {ico:'&#128161;',lbl:'가로등',cat:'build',fx:'square'},
+  castle:   {ico:'&#127963;',lbl:'성',    cat:'build',fx:'deep'},
+  tent:     {ico:'&#9978;', lbl:'텐트',  cat:'build',fx:'soft'},
+  // 🌤 Weather
+  sun:      {ico:'&#9728;', lbl:'태양',  cat:'weather',fx:'square'},
+  cloud:    {ico:'&#127782;',lbl:'구름', cat:'weather',fx:'drizzle'},
+  rain:     {ico:'&#127783;',lbl:'비',   cat:'weather',fx:'heavyrain'},
+  snow:     {ico:'&#127784;',lbl:'눈보라',cat:'weather',fx:'blizzard'},
+  // 👥 People
+  person1:  {ico:'&#128104;',lbl:'남자', cat:'people',fx:'default'},
+  person2:  {ico:'&#128105;',lbl:'여자', cat:'people',fx:'bright'},
+  child:    {ico:'&#128116;',lbl:'어린이',cat:'people',fx:'bright'},
+  family:   {ico:'&#128106;',lbl:'가족', cat:'people',fx:'soft'},
+  dance:    {ico:'&#128111;',lbl:'춤',   cat:'people',fx:'bird'},
+  // 🛠 Tools
+  eraser:   {ico:'&#129529;',lbl:'지우개',cat:'tool',fx:''}
+};
+
+const CAT_LABELS={nature:'🌱 자연',creature:'🐾 동물',build:'🏡 건물',weather:'🌤 날씨',people:'👥 사람',tool:'🛠'};
+
+const SP={
+  spring: ['flower','cherry','bird','butterfly','sprout','cloud','person1','person2','child','house','tree','lamp','eraser'],
+  summer: ['sun','rain','bee','sunflower','frog','tent','person1','person2','child','house','tree','lamp','eraser'],
+  autumn: ['leaf','mushroom','bird','frog','house','castle','person1','person2','family','tree','lamp','eraser'],
+  winter: ['snowflake','snow','house','castle','lamp','tent','person1','person2','child','family','dance','eraser'],
+  keys:   ['flower','bird','leaf','snowflake','sun','cloud','person1','person2','dance','house','tree','lamp','eraser']
+};
+
+// AUDIO
+let aCtx=null;
+function gCtx(){if(!aCtx)aCtx=new(window.AudioContext||window.webkitAudioContext)();if(aCtx.state==='suspended')aCtx.resume();return aCtx;}
+function m2f(m){return 440*Math.pow(2,(m-69)/12);}
+function pFx(fx,freq){
+  const ctx=gCtx(),t=ctx.currentTime;
+  const mk=(tp,f,v,s,at,dc)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type=tp;o.frequency.value=f;g.gain.setValueAtTime(0,s);g.gain.linearRampToValueAtTime(v,s+at);g.gain.exponentialRampToValueAtTime(0.001,s+dc);o.connect(g);g.connect(ctx.destination);o.start(s);o.stop(s+dc+0.05);};
+  if(fx==='heavyrain'){const o=ctx.createOscillator(),f=ctx.createBiquadFilter(),g=ctx.createGain();o.type='sawtooth';o.frequency.value=freq;f.type='lowpass';f.frequency.value=500;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.2,t+0.01);g.gain.exponentialRampToValueAtTime(0.001,t+0.42);o.connect(f);f.connect(g);g.connect(ctx.destination);o.start(t);o.stop(t+0.48);}
+  else if(fx==='drizzle'){for(let i=0;i<3;i++)mk('sine',freq*(1+i*0.005),0.12,t+i*0.06,0.01,0.28);}
+  else if(fx==='snow'||fx==='blizzard'){const o=ctx.createOscillator(),lfo=ctx.createOscillator(),lg=ctx.createGain(),mg=ctx.createGain();o.type='triangle';o.frequency.value=freq;lfo.frequency.value=7;lg.gain.value=0.15;mg.gain.setValueAtTime(0.2,t);mg.gain.exponentialRampToValueAtTime(0.001,t+0.65);lfo.connect(lg);lg.connect(mg.gain);o.connect(mg);mg.connect(ctx.destination);o.start(t);o.stop(t+0.7);lfo.start(t);lfo.stop(t+0.7);}
+  else if(fx==='bird'){mk('triangle',freq,0.22,t,0.01,0.32);mk('triangle',freq*1.5,0.1,t+0.09,0.01,0.18);}
+  else if(fx==='bright'){mk('sine',freq,0.24,t,0.01,0.48);mk('sine',freq*2,0.06,t,0.01,0.22);}
+  else if(fx==='wave'){mk('sine',freq,0.22,t,0.05,0.75);}
+  else if(fx==='buzz'){mk('square',freq,0.12,t,0.005,0.24);mk('square',freq*1.01,0.08,t,0.005,0.24);}
+  else if(fx==='square'){mk('square',freq,0.16,t,0.01,0.3);}
+  else if(fx==='deep'){mk('sine',freq,0.22,t,0.04,0.68);mk('sine',freq*0.5,0.08,t,0.04,0.68);}
+  else if(fx==='soft'){mk('triangle',freq,0.22,t,0.02,0.5);}
+  else{mk('sine',freq,0.25,t,0.015,0.52);}
+}
+function pNote(type,ni){pFx(AO[type]?.fx||'default',m2f(SE[season].notes[ni]));}
+
+// STATE
+let objs=[],season='spring',playing=false,tool='flower',tempo=90,selId=null,nxtId=1;
+let animId=null,lastTs=null;
+
+// ── CANVAS BACKGROUND ────────────────────────────────
+function drawBg(){
+  const cvs=document.getElementById('bg-canvas');
+  const wrap=document.getElementById('canvas-wrap');
+  const W=wrap.clientWidth||400,H=wrap.clientHeight||300;
+  cvs.width=W;cvs.height=H;cvs.style.width='100%';cvs.style.height='100%';
+  const ctx2=cvs.getContext('2d');
+  const BGSCS={
+    spring:{sky:['#87CEEB','#B0E0A0','#4A9A30'],ground:['#4A9A30','#2A7018']},
+    summer:{sky:['#FFC840','#87CEEB','#5AB040'],ground:['#3A9020','#1A6010']},
+    autumn:{sky:['#D4701A','#C05818','#7A3818'],ground:['#6A2810','#3A1408']},
+    winter:{sky:['#A8C0D8','#D8EAF8','#EAEFFF'],ground:['#DDEEFF','#C0D8F0']},
+    keys:  {sky:['#9070C8','#B892E8','#7050A8'],ground:['#5030A0','#301080']}
+  };
+  const sc=BGSCS[season]||BGSCS.spring;
+  // Sky gradient
+  const grd=ctx2.createLinearGradient(0,0,0,H*0.72);
+  grd.addColorStop(0,sc.sky[0]);grd.addColorStop(0.5,sc.sky[1]);grd.addColorStop(1,sc.sky[2]);
+  ctx2.fillStyle=grd;ctx2.fillRect(0,0,W,H);
+  // Ground gradient
+  const grnd=ctx2.createLinearGradient(0,H*0.65,0,H);
+  grnd.addColorStop(0,sc.ground[0]);grnd.addColorStop(1,sc.ground[1]);
+  ctx2.fillStyle=grnd;ctx2.fillRect(0,H*0.65,W,H*0.35);
+  // Smooth horizon blend
+  const hrz=ctx2.createLinearGradient(0,H*0.62,0,H*0.72);
+  hrz.addColorStop(0,'rgba(0,0,0,0)');hrz.addColorStop(1,sc.ground[0]+'CC');
+  ctx2.fillStyle=hrz;ctx2.fillRect(0,H*0.62,W,H*0.1);
+  // Decorative elements per season
+  if(season==='spring'){
+    // Clouds
+    drawCloud(ctx2,W*0.15,H*0.12,55,18,'rgba(255,255,255,0.82)');
+    drawCloud(ctx2,W*0.68,H*0.08,42,15,'rgba(255,255,255,0.72)');
+    // Cherry trees
+    drawTree(ctx2,W*0.07,H*0.7,18,45,'#8B6040','#FFB7C5',0.88);
+    drawTree(ctx2,W*0.92,H*0.72,16,42,'#8B6040','#FFB7C5',0.82);
+  } else if(season==='summer'){
+    // Sun
+    ctx2.save();ctx2.globalAlpha=0.9;
+    const sg=ctx2.createRadialGradient(W*0.85,H*0.12,8,W*0.85,H*0.12,40);
+    sg.addColorStop(0,'#FFE566');sg.addColorStop(0.6,'#FFD700');sg.addColorStop(1,'rgba(255,200,0,0)');
+    ctx2.fillStyle=sg;ctx2.beginPath();ctx2.arc(W*0.85,H*0.12,38,0,Math.PI*2);ctx2.fill();ctx2.restore();
+    drawTree(ctx2,W*0.06,H*0.68,22,50,'#5A3A1A','#2A7A18',0.85);
+    drawTree(ctx2,W*0.93,H*0.70,20,48,'#5A3A1A','#2A7A18',0.82);
+  } else if(season==='autumn'){
+    // Bare trees
+    drawBareTree(ctx2,W*0.07,H*0.7,20,52,'#4A2210');
+    drawBareTree(ctx2,W*0.91,H*0.72,18,48,'#4A2210');
+    // Falling leaves
+    [[0.22,0.6],[0.45,0.55],[0.65,0.62],[0.78,0.58],[0.35,0.65]].forEach(([lx,ly])=>{
+      ctx2.save();ctx2.globalAlpha=0.65;
+      ctx2.fillStyle=`hsl(${25+Math.random()*30},80%,50%)`;
+      ctx2.beginPath();ctx2.ellipse(W*lx,H*ly,5,3,Math.random()*Math.PI,0,Math.PI*2);
+      ctx2.fill();ctx2.restore();
+    });
+  } else if(season==='winter'){
+    // Snow ground
+    const sw=ctx2.createLinearGradient(0,H*0.65,0,H);
+    sw.addColorStop(0,'rgba(255,255,255,0.9)');sw.addColorStop(1,'rgba(220,235,255,0.9)');
+    ctx2.fillStyle=sw;ctx2.fillRect(0,H*0.68,W,H*0.32);
+    // Snow-bare trees
+    drawBareTree(ctx2,W*0.07,H*0.7,18,50,'#6A7888');
+    drawBareTree(ctx2,W*0.91,H*0.72,16,46,'#6A7888');
+    // Snow particles
+    for(let i=0;i<18;i++){
+      ctx2.save();ctx2.globalAlpha=0.7;ctx2.fillStyle='#fff';
+      ctx2.beginPath();ctx2.arc(W*Math.random(),H*Math.random()*0.6,2+Math.random()*2,0,Math.PI*2);
+      ctx2.fill();ctx2.restore();
+    }
+  } else if(season==='keys'){
+    // Stars/sparkles
+    for(let i=0;i<20;i++){
+      ctx2.save();ctx2.globalAlpha=0.6+Math.random()*0.3;ctx2.fillStyle='#D0C0FF';
+      ctx2.beginPath();ctx2.arc(W*Math.random(),H*Math.random()*0.55,1.5+Math.random()*2,0,Math.PI*2);
+      ctx2.fill();ctx2.restore();
+    }
+    drawCloud(ctx2,W*0.2,H*0.15,40,14,'rgba(200,180,255,0.5)');
+    drawCloud(ctx2,W*0.75,H*0.1,35,12,'rgba(180,160,255,0.45)');
+  }
+  // Pitch guide
+  const pg=document.getElementById('pitch-guide');pg.innerHTML='';
+  SE[season].names.slice().reverse().forEach(nm=>{
+    const d=document.createElement('div');d.className='pitch-tick';d.textContent=nm;pg.appendChild(d);
+  });
+}
+function drawCloud(ctx,x,y,w,h,col){
+  ctx.save();ctx.fillStyle=col;
+  ctx.beginPath();ctx.ellipse(x,y,w,h,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(x-w*0.4,y+h*0.1,w*0.6,h*0.75,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(x+w*0.38,y+h*0.15,w*0.55,h*0.7,0,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+}
+function drawTree(ctx,x,yb,r,h,tc,fc,op){
+  ctx.save();ctx.globalAlpha=op;
+  ctx.fillStyle=tc;ctx.fillRect(x-3,yb-h,6,h);
+  ctx.fillStyle=fc;ctx.beginPath();ctx.arc(x,yb-h,r,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+}
+function drawBareTree(ctx,x,yb,bw,h,col){
+  ctx.save();ctx.strokeStyle=col;ctx.lineWidth=bw*0.22;ctx.globalAlpha=0.75;
+  ctx.beginPath();ctx.moveTo(x,yb);ctx.lineTo(x,yb-h);ctx.stroke();
+  ctx.lineWidth=bw*0.14;
+  ctx.beginPath();ctx.moveTo(x,yb-h*0.6);ctx.lineTo(x+bw,yb-h*0.8);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(x,yb-h*0.5);ctx.lineTo(x-bw,yb-h*0.68);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(x,yb-h*0.75);ctx.lineTo(x+bw*0.7,yb-h*0.92);ctx.stroke();
+  ctx.restore();
+}
+
+// ── Y-POSITION → NOTE INDEX ──────────────────────────
+function yToNote(yFrac){
+  // top (yFrac=0) = highest note (index 7), bottom = lowest (index 0)
+  return Math.round((1-yFrac)*7);
+}
+
+// ── OBJECT RENDERING ─────────────────────────────────
+function renderObjs(){
+  const lay=document.getElementById('obj-layer');lay.innerHTML='';
+  objs.forEach(o=>{
+    const el=document.createElement('div');
+    el.className='cobj'+(selId===o.id?' sel':'');
+    el.dataset.id=o.id;
+    el.style.left=(o.xf*100).toFixed(1)+'%';
+    el.style.top=(o.yf*100).toFixed(1)+'%';
+    el.innerHTML=`<div class="cobj-inner">${AO[o.type]?.ico||'?'}</div><div class="cobj-note">${SE[season].names[o.ni]}</div>`;
+    lay.appendChild(el);
+  });
+}
+function flashObj(id){
+  const el=document.querySelector(`.cobj[data-id="${id}"]`);
+  if(!el)return;el.classList.add('lit');setTimeout(()=>el.classList.remove('lit'),280);
+}
+
+// ── NOTE POPUP ────────────────────────────────────────
+let npopOpen=false;
+function openNpop(id){
+  selId=id;renderObjs();
+  const o=objs.find(x=>x.id===id);if(!o)return;
+  const el=document.querySelector(`.cobj[data-id="${id}"]`);
+  const pop=document.getElementById('npop');
+  pop.style.left='50%';pop.style.top='50%';
+  pop.style.transform='translate(-50%,-50%)';
+  document.getElementById('np-title').innerHTML=(AO[o.type]?.ico||'')+'  '+AO[o.type]?.lbl;
+  const btns=document.getElementById('np-btns');btns.innerHTML='';
+  SE[season].names.forEach((nm,i)=>{
+    const b=document.createElement('button');b.className='npb'+(o.ni===i?' on':'');b.textContent=nm;
+    b.onclick=()=>{o.ni=i;pNote(o.type,i);renderObjs();openNpop(id);};
+    btns.appendChild(b);
+  });
+  pop.classList.add('show');npopOpen=true;
+}
+function closeNpop(){document.getElementById('npop').classList.remove('show');npopOpen=false;selId=null;renderObjs();}
+function deleteSel(){if(selId!=null){objs=objs.filter(o=>o.id!==selId);closeNpop();}}
+
+// ── HIT LAYER INTERACTION ─────────────────────────────
+const hl=document.getElementById('hit-layer');
+function getCanvasXY(e){
+  const r=document.getElementById('canvas-wrap').getBoundingClientRect();
+  return{xf:(e.clientX-r.left)/r.width, yf:(e.clientY-r.top)/r.height};
+}
+hl.addEventListener('click',onCanvasTap);
+hl.addEventListener('touchend',function(e){e.preventDefault();if(e.changedTouches[0])onCanvasTap(e.changedTouches[0]);},{passive:false});
+
+function onCanvasTap(e){
+  if(npopOpen){closeNpop();return;}
+  const{xf,yf}=getCanvasXY(e);
+  // Check hit on existing object
+  const hit=objs.find(o=>Math.abs(o.xf-xf)<0.07&&Math.abs(o.yf-yf)<0.08);
+  if(hit){openNpop(hit.id);return;}
+  if(tool==='eraser')return;
+  gCtx();
+  const ni=Math.max(0,Math.min(7,yToNote(yf)));
+  objs.push({id:nxtId++,type:tool,xf,yf,ni});
+  pNote(tool,ni);
+  renderObjs();
+}
+
+// ── TRAVELERS — 8 independent characters ─────────────
+const TRAV_SPEEDS=[0.18,0.13,0.22,0.16,0.20,0.11,0.24,0.15];
+const TRAV_WANDER=[0.012,0.018,0.009,0.022,0.015,0.025,0.010,0.020]; // vertical wander amplitude
+const WANDER_FREQ=[0.8,1.2,0.6,1.5,1.0,0.7,1.3,0.9];
+
+const travs=Array.from({length:8},(_,i)=>({
+  active:false, x:0.5, y:(i+1)/9,
+  vx:0, vy:0,
+  phase:Math.random()*Math.PI*2,
+  triggered:{},
+  el:null, btnEl:null,
+  startDelay:0
+}));
+
+function renderLpRow(){
+  const row=document.getElementById('lp-row');row.innerHTML='';
+  travs.forEach((t,i)=>{
+    const btn=document.createElement('button');
+    btn.className='lbtn'+(t.active?' on':'');
+    const icon=SE[season].travs[i];
+    const note=SE[season].names[i];
+    btn.innerHTML=`<span class="lico">${icon}</span><span class="lnote">${note}</span><span class="lstatus">${t.active?'출발!':'대기'}</span><div class="go-flash"></div>`;
+    btn.onclick=()=>launchTraveler(i,btn);
+    t.btnEl=btn;
+    row.appendChild(btn);
+  });
+}
+
+function launchTraveler(i,btn){
+  gCtx();
+  const t=travs[i];
+  if(t.active){
+    // Stop this traveler
+    t.active=false;
+    if(t.el){t.el.remove();t.el=null;}
+    btn.className='lbtn';
+    btn.querySelector('.lstatus').textContent='대기';
+  } else {
+    // Launch with brief visual feedback
+    btn.classList.add('go-animate');
+    setTimeout(()=>btn.classList.remove('go-animate'),400);
+    btn.classList.add('counting');
+    setTimeout(()=>{
+      t.active=true;
+      t.x=Math.random()*0.8+0.1;
+      t.y=(i+1)/9;
+      t.phase=Math.random()*Math.PI*2;
+      t.triggered={};
+      t.vx=(Math.random()>0.5?1:-1)*TRAV_SPEEDS[i];
+      // Create DOM element
+      if(t.el)t.el.remove();
+      const el=document.createElement('div');
+      el.className='trav-el';
+      el.innerHTML=SE[season].travs[i];
+      document.getElementById('trav-layer').appendChild(el);
+      t.el=el;
+      btn.className='lbtn on';
+      btn.querySelector('.lstatus').textContent='출발!';
+      if(!playing)startPlay();
+    },250);
+  }
+}
+
+// ── ANIMATION LOOP ────────────────────────────────────
+let animTime=0;
+function animate(ts){
+  if(!playing)return;
+  const dt=lastTs?Math.min((ts-lastTs)/1000,0.07):0;
+  lastTs=ts;animTime+=dt;
+  const spd=tempo/90;
+  const now=Date.now();
+  travs.forEach((t,i)=>{
+    if(!t.active)return;
+    // Move horizontally
+    t.x+=t.vx*spd*dt;
+    // Gentle vertical wander (sine wave)
+    const baseY=(i+1)/9;
+    t.y=baseY+Math.sin(animTime*WANDER_FREQ[i]+t.phase)*TRAV_WANDER[i];
+    // Bounce off edges
+    if(t.x>1.05){t.x=1.05;t.vx=-Math.abs(t.vx);}
+    if(t.x<-0.05){t.x=-0.05;t.vx=Math.abs(t.vx);}
+    t.y=Math.max(0.02,Math.min(0.98,t.y));
+    // Update DOM
+    if(t.el){
+      t.el.style.left=(t.x*100).toFixed(1)+'%';
+      t.el.style.top=(t.y*100).toFixed(1)+'%';
+      t.el.style.transform=`translate(-50%,-50%)${t.vx<0?' scaleX(-1)':''}`;
+    }
+    // Check collision with objects
+    objs.forEach(obj=>{
+      const dx=t.x-obj.xf,dy=t.y-obj.yf;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      const last=t.triggered[obj.id]||0;
+      if(dist<0.07&&now-last>350){
+        t.triggered[obj.id]=now;
+        pNote(obj.type,obj.ni);
+        flashObj(obj.id);
+        if(t.el){t.el.classList.add('lit');setTimeout(()=>t.el?.classList.remove('lit'),200);}
+      }
+    });
+  });
+  animId=requestAnimationFrame(animate);
+}
+
+function startPlay(){playing=true;lastTs=null;document.getElementById('pbtn').innerHTML='&#9646; 멈추기';document.getElementById('pbtn').className='pbtn st';animId=requestAnimationFrame(animate);}
+function stopPlay(){playing=false;if(animId)cancelAnimationFrame(animId);document.getElementById('pbtn').innerHTML='&#9654; 연주!';document.getElementById('pbtn').className='pbtn go';}
+function togglePlay(){if(playing)stopPlay();else{if(!travs.some(t=>t.active))launchTraveler(0,travs[0].btnEl);startPlay();}}
+function onTempo(v){tempo=parseInt(v);document.getElementById('tval').textContent=tempo;}
+
+// ── PALETTE ───────────────────────────────────────────
+function renderPal(){
+  const pal=document.getElementById('pal');pal.innerHTML='';
+  const stag=document.createElement('div');stag.className='stag';stag.innerHTML=SE[season].label+' 오브젝트';pal.appendChild(stag);
+  SP[season].forEach(k=>{
+    const o=AO[k];const b=document.createElement('button');
+    b.className='ob'+(k===tool?' on':'');
+    b.innerHTML=`<div class="obico">${o.ico}</div><div class="oblbl">${o.lbl}</div>`;
+    b.onclick=()=>{tool=k;document.querySelectorAll('.ob').forEach(x=>x.classList.remove('on'));b.classList.add('on');};
+    pal.appendChild(b);
+  });
+}
+
+// ── SEASON ───────────────────────────────────────────
+function setSeason(s){
+  season=s;
+  document.body.style.background=SE[s].bg;
+  document.querySelectorAll('.sbtn').forEach(b=>b.classList.toggle('on',b.dataset.s===s));
+  // Reset travelers
+  travs.forEach(t=>{t.active=false;if(t.el){t.el.remove();t.el=null;}});
+  document.getElementById('trav-layer').innerHTML='';
+  drawBg();renderPal();renderObjs();renderLpRow();
+  closeNpop();
+}
+function renderSbar(){
+  const sb=document.getElementById('sbar');sb.innerHTML='';
+  Object.entries(SE).forEach(([k,s])=>{const b=document.createElement('button');b.className='sbtn'+(k===season?' on':'');b.dataset.s=k;b.innerHTML=s.label;b.onclick=()=>setSeason(k);sb.appendChild(b);});
+}
+
+function loadDemo(){
+  stopPlay();travs.forEach(t=>{t.active=false;if(t.el){t.el.remove();t.el=null;}});nxtId=1;
+  if(season!=='spring')setSeason('spring');
+  objs=[
+    {id:nxtId++,type:'bird',    xf:0.12,yf:0.12,ni:7},
+    {id:nxtId++,type:'cherry',  xf:0.30,yf:0.22,ni:5},
+    {id:nxtId++,type:'flower',  xf:0.50,yf:0.35,ni:4},
+    {id:nxtId++,type:'butterfly',xf:0.70,yf:0.20,ni:6},
+    {id:nxtId++,type:'flower',  xf:0.88,yf:0.30,ni:5},
+    {id:nxtId++,type:'house',   xf:0.18,yf:0.72,ni:1},
+    {id:nxtId++,type:'person2', xf:0.32,yf:0.78,ni:2},
+    {id:nxtId++,type:'tree',    xf:0.48,yf:0.65,ni:3},
+    {id:nxtId++,type:'person1', xf:0.62,yf:0.80,ni:2},
+    {id:nxtId++,type:'house',   xf:0.78,yf:0.73,ni:1},
+    {id:nxtId++,type:'lamp',    xf:0.92,yf:0.68,ni:1},
+    {id:nxtId++,type:'child',   xf:0.40,yf:0.82,ni:3},
+  ];
+  renderObjs();renderLpRow();
+  // Launch 4 travelers staggered
+  [0,2,4,6].forEach((ti,n)=>setTimeout(()=>{if(travs[ti].btnEl)launchTraveler(ti,travs[ti].btnEl);},n*700));
+}
+
+function clearAll(){
+  stopPlay();
+  travs.forEach(t=>{t.active=false;if(t.el){t.el.remove();t.el=null;}});
+  objs=[];nxtId=1;closeNpop();renderObjs();renderLpRow();
+}
+
+// Resize
+window.addEventListener('resize',()=>{ drawBg(); });
+
+// Init
+renderSbar();drawBg();renderPal();renderLpRow();
+
+// ══════════════════════════════════════════
+// PAGE 2 — CLIMATE (realistic)
+// ══════════════════════════════════════════
+function lerp(a,b,t){return a+(b-a)*t;}
+function lerpRGB(c1,c2,t){return[Math.round(lerp(c1[0],c2[0],t)),Math.round(lerp(c1[1],c2[1],t)),Math.round(lerp(c1[2],c2[2],t))];}
+function rgb(c){return `rgb(${c[0]},${c[1]},${c[2]})`;}
+
+function buildRealScene(year){
+  const p=Math.max(0,Math.min(1,(year-1750)/350)),p2=p*p,p15=Math.pow(p,1.4);
+  const skyT=lerpRGB([15,55,110],[50,20,5],p15);
+  const skyM=lerpRGB([60,140,210],[140,70,20],p15);
+  const skyH=lerpRGB([110,190,240],[200,120,50],p15);
+  const skyB=lerpRGB([170,220,250],[210,150,70],p15);
+  const sunC=lerpRGB([255,248,180],[255,80,20],p15);
+  const sunR=Math.round(lerp(22,14,p));
+  const iceW=Math.round(lerp(90,3,p15));
+  const seaRise=Math.round(lerp(195,172,p2));
+  const groundC=lerpRGB([30,90,20],[60,35,10],p15);
+  const groundC2=lerpRGB([20,70,15],[40,20,5],p15);
+  const oceanC=lerpRGB([20,80,160],[40,55,70],p2);
+  const treeCount=Math.max(Math.round(lerp(8,0,p15)),0);
+  const treeHealth=Math.max(1-p*0.88,0.08);
+  const treeXs=[32,68,108,155,200,248,310,360];
+  let treeSvg='';
+  for(let i=0;i<8;i++){
+    const x=treeXs[i],yb=seaRise-2,h=Math.round(lerp(38,20,p2));
+    if(i<treeCount){
+      const fw=Math.round(h*0.55);
+      const tc=treeHealth>0.4?`rgb(${Math.round(lerp(25,80,p))},${Math.round(lerp(100,50,p))},${Math.round(lerp(20,10,p))})`:'rgb(80,50,20)';
+      treeSvg+=`<rect x="${x-2}" y="${yb-h}" width="4" height="${h}" fill="#5A3018"/>
+        <polygon points="${x},${yb-h-4} ${x-fw},${yb-h*0.35} ${x+fw},${yb-h*0.35}" fill="${tc}" opacity="${treeHealth}"/>
+        <polygon points="${x},${yb-h-4-Math.round(h*0.22)} ${x-fw*0.75},${yb-h*0.62} ${x+fw*0.75},${yb-h*0.62}" fill="${tc}" opacity="${treeHealth*0.9}"/>`;
+    } else if(p>0.45){
+      treeSvg+=`<rect x="${x-2}" y="${seaRise-8}" width="4" height="8" fill="#4A2810" opacity="${Math.min((p-0.45)*1.8,0.55)}"/>`;
+    }
+  }
+  const factCount=Math.round(lerp(0,9,p2));
+  const factXs=[85,130,175,220,265,300,340,370,105];
+  let factSvg='';
+  for(let i=0;i<Math.min(factCount,9);i++){
+    const fx=factXs[i],fy=seaRise,fw=Math.round(lerp(24,38,p)),fh=Math.round(lerp(20,36,p));
+    factSvg+=`<rect x="${fx}" y="${fy-fh}" width="${fw}" height="${fh}" fill="#252525"/>
+      <rect x="${fx+3}" y="${fy-fh-Math.round(lerp(14,26,p))}" width="5" height="${Math.round(lerp(14,26,p))}" fill="#1A1A1A"/>
+      <rect x="${fx+fw-9}" y="${fy-fh-Math.round(lerp(10,20,p))}" width="4" height="${Math.round(lerp(10,20,p))}" fill="#1A1A1A"/>
+      <rect x="${fx+2}" y="${fy-fh+4}" width="4" height="3" fill="#806040" opacity="0.4"/>`;
+  }
+  let smokeSvg='';
+  const sAmt=Math.min(p15*1.2,1.0);
+  if(factCount>0){
+    const sXs=factXs.slice(0,Math.min(factCount,6));
+    sXs.forEach((sx,si)=>{
+      const sy=seaRise-Math.round(lerp(20,36,p2));
+      const sr=Math.round(lerp(7,26,sAmt));
+      const sg=Math.round(lerp(120,55,p));
+      smokeSvg+=`<radialGradient id="rsg${si}" cx="50%" cy="70%" r="50%">
+        <stop offset="0%" stop-color="rgb(${sg},${sg},${sg})" stop-opacity="${(sAmt*0.72).toFixed(2)}"/>
+        <stop offset="100%" stop-color="rgb(${sg},${sg},${sg})" stop-opacity="0"/>
+      </radialGradient>
+      <ellipse cx="${sx+7}" cy="${sy-sr*0.5}" rx="${sr}" ry="${sr*0.65}" fill="url(#rsg${si})"/>
+      <ellipse cx="${sx+5}" cy="${sy-sr}" rx="${sr*0.65}" ry="${sr*0.5}" fill="url(#rsg${si})" opacity="0.65"/>
+      <ellipse cx="${sx+9}" cy="${sy-sr*1.6}" rx="${sr*0.45}" ry="${sr*0.35}" fill="url(#rsg${si})" opacity="0.45"/>`;
+    });
+  }
+  const hazeR=Math.round(lerp(180,240,p2)),hazeG=Math.round(lerp(200,120,p2)),hazeB=Math.round(lerp(220,40,p2));
+  const hazeA=(p2*0.50).toFixed(2);
+  return`<defs>
+    <linearGradient id="rsky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${rgb(skyT)}"/><stop offset="25%" stop-color="${rgb(skyM)}"/>
+      <stop offset="60%" stop-color="${rgb(skyH)}"/><stop offset="85%" stop-color="${rgb(skyB)}"/>
+      <stop offset="100%" stop-color="${rgb(groundC)}"/>
+    </linearGradient>
+    <linearGradient id="rgnd" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${rgb(groundC)}"/><stop offset="100%" stop-color="${rgb(groundC2)}"/>
+    </linearGradient>
+    <linearGradient id="rocn" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${rgb(oceanC)}"/><stop offset="100%" stop-color="${rgb(lerpRGB(oceanC,[10,30,60],0.5))}"/>
+    </linearGradient>
+    <radialGradient id="rsun" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="${rgb(sunC)}" stop-opacity="${(0.3-p*0.15).toFixed(2)}"/>
+      <stop offset="100%" stop-color="${rgb(sunC)}" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="rsm"><feGaussianBlur stdDeviation="3.5"/></filter>
+    ${smokeSvg}
+  </defs>
+  <rect width="400" height="240" fill="url(#rsky)"/>
+  <ellipse cx="68" cy="26" rx="${sunR*2.8}" ry="${sunR*2.8}" fill="url(#rsun)"/>
+  <circle cx="68" cy="26" r="${sunR}" fill="${rgb(sunC)}"/>
+  ${iceW>4?`<ellipse cx="200" cy="7" rx="${iceW}" ry="${Math.max(iceW*0.26,3)}" fill="white" opacity="0.88"/>
+    <ellipse cx="200" cy="8" rx="${iceW*0.82}" ry="${Math.max(iceW*0.16,2)}" fill="#B0D8F0" opacity="0.6"/>`:''}
+  <rect x="0" y="${seaRise}" width="400" height="${240-seaRise}" fill="url(#rocn)"/>
+  <ellipse cx="200" cy="${seaRise}" rx="220" ry="13" fill="url(#rgnd)"/>
+  <rect x="0" y="${seaRise-1}" width="400" height="${240-seaRise+1}" fill="url(#rgnd)" opacity="0.65"/>
+  ${treeSvg}
+  ${factSvg}
+  <g filter="url(#rsm)"></g>
+  ${smokeSvg.replace(/<radialGradient[\s\S]*?<\/radialGradient>/g,'')}
+  <rect x="0" y="0" width="400" height="240" fill="rgba(${hazeR},${hazeG},${hazeB},${hazeA})"/>`;
+}
+
+function updateClimate(year){
+  const y=Math.max(1750,Math.min(2100,parseInt(year))),p=Math.pow((y-1750)/350,1.4);
+  document.getElementById('yrv').textContent=y+'년';
+  document.getElementById('co2v').textContent=Math.round(280+480*p);
+  document.getElementById('tempv').textContent='+'+(4.5*p).toFixed(1)+'°';
+  document.getElementById('seav').textContent='+'+Math.round(80*p*p)+'cm';
+  document.getElementById('icepct').textContent=Math.round(Math.max(100-p*98,1))+'%';
+  document.getElementById('cscene-svg').innerHTML=buildRealScene(y);
+}
+
+function showCmp(){
+  document.getElementById('cpanel').classList.add('show');
+  document.getElementById('c1svg').innerHTML=`
+    <defs><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1A7AB8"/><stop offset="45%" stop-color="#87CEEB"/><stop offset="70%" stop-color="#98D870"/><stop offset="100%" stop-color="#228B22"/></linearGradient></defs>
+    <rect width="200" height="150" fill="url(#cg1)"/>
+    <circle cx="165" cy="22" r="15" fill="#FFE066"/>
+    <g fill="white" opacity="0.82"><ellipse cx="35" cy="25" rx="18" ry="9"/><ellipse cx="22" cy="21" rx="11" ry="9"/><ellipse cx="48" cy="20" rx="13" ry="8"/></g>
+    <ellipse cx="100" cy="148" rx="115" ry="18" fill="#228B22" opacity="0.7"/>
+    <rect x="10" y="92" width="5" height="42" fill="#8B6040"/><circle cx="13" cy="86" r="16" fill="#FFB7C5" opacity="0.9"/>
+    <rect x="55" y="96" width="4" height="38" fill="#6B4423"/><ellipse cx="57" cy="90" rx="14" ry="16" fill="#2D7A1A"/>
+    <circle cx="42" cy="118" r="4" fill="#FFB7C5" opacity="0.7"/><circle cx="80" cy="112" r="3" fill="#FFB7C5" opacity="0.65"/>
+    <text x="100" y="60" text-anchor="middle" font-size="11" fill="rgba(0,80,0,0.9)" font-weight="bold">🎵 새소리 꽃향기</text>
+    <text x="100" y="74" text-anchor="middle" font-size="10" fill="rgba(0,100,0,0.8)">맑고 아름다운 봄</text>`;
+  document.getElementById('c2svg').innerHTML=`
+    <defs><linearGradient id="cg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3A1A05"/><stop offset="40%" stop-color="#9A5818"/><stop offset="100%" stop-color="#6A3818"/></linearGradient>
+    <radialGradient id="haze2" cx="50%" cy="30%" r="60%"><stop offset="0%" stop-color="rgba(200,100,30,0.4)"/><stop offset="100%" stop-color="rgba(200,100,30,0)"/></radialGradient></defs>
+    <rect width="200" height="150" fill="url(#cg2)"/>
+    <ellipse cx="100" cy="148" rx="115" ry="16" fill="#5A2A10" opacity="0.7"/>
+    <rect x="10" y="90" width="5" height="44" fill="#3A1E0A"/>
+    <line x1="12" y1="108" x2="28" y2="95" stroke="#3A1E0A" stroke-width="3"/>
+    <rect x="60" y="95" width="5" height="39" fill="#3A1E0A"/>
+    <line x1="62" y1="112" x2="76" y2="100" stroke="#3A1E0A" stroke-width="2.5"/>
+    <rect x="100" y="118" width="28" height="24" fill="#2A2A2A"/>
+    <rect x="104" y="100" width="7" height="20" fill="#1A1A1A"/><rect x="117" y="104" width="6" height="16" fill="#1A1A1A"/>
+    <ellipse cx="108" cy="96" rx="10" ry="7" fill="rgba(80,80,80,0.7)"/>
+    <rect x="0" y="0" width="200" height="150" fill="url(#haze2)"/>
+    <rect x="0" y="0" width="200" height="150" fill="rgba(160,80,20,0.28)"/>
+    <text x="100" y="56" text-anchor="middle" font-size="10" fill="rgba(255,120,30,0.95)" font-weight="bold">⚠ 대전 여름 161일</text>
+    <text x="100" y="70" text-anchor="middle" font-size="9" fill="rgba(255,150,50,0.9)">새들이 사라졌어요</text>`;
+}
+function hideCmp(){document.getElementById('cpanel').classList.remove('show');}
+updateClimate(1750);
+
+// ══════════════════════════════════════════
+// PAGE 3 — ECO ACTIONS
+// ══════════════════════════════════════════
+const ECOS=[
+  {id:'eat',   ico:'&#129382;',lbl:'채식',    co2:3.2,bw:80},
+  {id:'elec',  ico:'&#128161;',lbl:'절전',    co2:2.1,bw:52},
+  {id:'walk',  ico:'&#128694;',lbl:'걷기',    co2:2.8,bw:70},
+  {id:'shower',ico:'&#128703;',lbl:'절수',    co2:0.8,bw:20},
+  {id:'bag',   ico:'&#128717;',lbl:'장바구니',co2:0.5,bw:12},
+  {id:'plant', ico:'&#127807;',lbl:'식물',    co2:1.0,bw:25},
+  {id:'recycle',ico:'&#9851;', lbl:'분리수거',co2:1.5,bw:38},
+  {id:'less',  ico:'&#129380;',lbl:'고기줄이기',co2:4.0,bw:100}
+];
+const EARTH_STAGES=['&#128577;','&#128532;','&#128528;','&#128522;','&#127757;'];
+let pledged=new Set();
+
+function renderEco(){
+  const g=document.getElementById('ecogrid');g.innerHTML='';
+  ECOS.forEach(a=>{
+    const c=document.createElement('div');
+    c.className='ecard'+(pledged.has(a.id)?' pledged':'');
+    c.innerHTML=`<div class="eico">${a.ico}</div><div class="elbl">${a.lbl}</div>
+      <div class="ebar-w"><div class="ebar" style="width:${pledged.has(a.id)?a.bw:0}%"></div></div>
+      <div class="echk">&#10003;</div>`;
+    c.onclick=()=>{pledged.has(a.id)?pledged.delete(a.id):pledged.add(a.id);renderEco();updateEcoScore();};
+    g.appendChild(c);
+  });
+}
+function updateEcoScore(){
+  const n=pledged.size,pct=n/8;
+  const hc=document.getElementById('hearts');hc.innerHTML='';
+  for(let i=0;i<8;i++){const h=document.createElement('span');h.className='heart';h.innerHTML=i<n?'&#10084;&#65039;':'&#129294;';hc.appendChild(h);}
+  document.getElementById('earthstage').innerHTML=EARTH_STAGES[Math.min(Math.floor(pct*5),4)];
+  document.getElementById('tempbar').style.width=(pct*100).toFixed(0)+'%';
+  document.getElementById('temptxt').textContent=Math.round(pct*100)+'%';
+}
+
+const ML=[{id:'ma',ico:'&#129382;',txt:'채식'},{id:'mb',ico:'&#128694;',txt:'걷기'},{id:'mc',ico:'&#128161;',txt:'절전'},{id:'md',ico:'&#127807;',txt:'식물'}];
+const MR=[{id:'mc',ico:'&#9889;',txt:'에너지↓'},{id:'ma',ico:'&#127757;',txt:'지구↑'},{id:'md',ico:'&#127807;',txt:'CO₂흡수'},{id:'mb',ico:'&#128168;',txt:'탄소0'}];
+let mSel=null,mScore=0,mDone=new Set();
+
+function renderMatch(){
+  const g=document.getElementById('mggrid');g.innerHTML='';
+  const shuffR=[...MR].sort(()=>Math.random()-0.5);
+  for(let i=0;i<ML.length;i++){
+    [ML[i],shuffR[i]].forEach((item,side)=>{
+      const c=document.createElement('div');
+      c.className='mc'+(mDone.has(item.id)&&side===0?' ok':'');
+      c.dataset.id=item.id;c.dataset.side=side;
+      c.innerHTML=`<div class="mc-ico">${item.ico}</div><div class="mc-txt">${item.txt}</div>`;
+      c.onclick=()=>handleMatch(c,item,side);
+      g.appendChild(c);
+    });
+  }
+  document.getElementById('mgresult').textContent=mScore>0?`✓ ${mScore}개 맞췄어요!`+(mScore>=4?' 🎉':''):'';
+}
+function handleMatch(el,item,side){
+  if(mDone.has(item.id)&&side===0)return;
+  if(!mSel){document.querySelectorAll('.mc.sel').forEach(c=>c.classList.remove('sel'));el.classList.add('sel');mSel={item,side};}
+  else{
+    if(mSel.side===side){document.querySelectorAll('.mc.sel').forEach(c=>c.classList.remove('sel'));el.classList.add('sel');mSel={item,side};return;}
+    const L=mSel.side===0?mSel:{item,side};const R=mSel.side===1?mSel:{item,side};
+    const ok=L.item.id===R.item.id;
+    document.querySelectorAll('.mc').forEach(c=>{
+      if(c.dataset.id===L.item.id&&c.dataset.side==='0')c.classList.add(ok?'ok':'no');
+      if(c.dataset.id===R.item.id&&c.dataset.side==='1')c.classList.add(ok?'ok':'no');
+    });
+    if(ok){mScore++;mDone.add(L.item.id);}
+    setTimeout(()=>{document.querySelectorAll('.mc.no').forEach(c=>c.classList.remove('no','sel'));document.getElementById('mgresult').innerHTML=mScore>0?`✓ ${mScore}개 맞췄어요!`+(mScore>=4?' 🎉 완벽해요!':''):'';},700);
+    mSel=null;
+  }
+}
+renderEco();updateEcoScore();renderMatch();
+</script>
+</body>
+</html>
