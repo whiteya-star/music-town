@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>트레팍 발레 열차</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&family=Noto+Sans+KR:wght@400;500;700;900&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* layout: 기차표 헤더 + 노선도(정거장 8곳) + 한 번에 한 정거장. 갤럭시탭 가로 화면, 큰 터치 버튼 */
+  --ink:#0e1730;
+  --panel:#172443;
+  --panel-2:#21315a;
+  --line:#33477a;
+  --gold:#e2bd62;
+  --crimson:#c8404d;
+  --snow:#f5f2ea;
+  --ice:#93c8ea;
+  --muted:#aab4cd;
+  --good:#5fcf8f;
+  --bad:#f08374;
+  --display:"Gowun Batang","Noto Serif KR",serif;
+  --body:"Noto Sans KR","Noto Sans",system-ui,sans-serif;
+  --cyr:"Playfair Display","Noto Serif",Georgia,serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--ink);color:var(--snow);font-family:var(--body);font-size:19px;line-height:1.55}
+body{min-height:100%;-webkit-tap-highlight-color:transparent}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.25}
+h2{font-size:2rem}
+h3{font-size:1.3rem;color:var(--gold)}
+p{margin:0}
+button{font:inherit;color:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+.wrap{max-width:1180px;margin:0 auto;padding:0 18px}
+
+/* 기차표 헤더 */
+.ticket{display:flex;align-items:stretch;gap:0;margin:16px 0 10px;background:linear-gradient(100deg,#7d1f2b,#a72f3c 55%,#7d1f2b);border-radius:14px;position:relative;overflow:hidden}
+.ticket .main{flex:1;padding:14px 22px;display:flex;flex-direction:column;gap:2px}
+.ticket .kicker{font-size:.8rem;letter-spacing:.14em;color:#ffd9a0}
+.ticket h1{font-size:1.75rem}
+.ticket .cyr{font-family:var(--cyr);color:var(--gold);font-size:1rem;letter-spacing:.06em}
+.ticket .stub{width:330px;border-left:3px dashed rgba(255,255,255,.35);padding:12px 16px;display:flex;flex-direction:column;justify-content:center;gap:8px}
+.ticket .stub small{color:#ffd9a0;font-size:.78rem}
+.stampcount{font-size:1.6rem;font-weight:900;font-variant-numeric:tabular-nums}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+.mini{min-height:44px;padding:6px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.35);background:rgba(0,0,0,.18);cursor:pointer;font-size:.85rem}
+
+/* 노선도 */
+.rail{position:relative;display:flex;gap:6px;overflow-x:auto;padding:12px 4px 10px;scrollbar-width:thin}
+.rail::before{content:"";position:absolute;left:30px;right:30px;top:40px;height:6px;background:repeating-linear-gradient(90deg,var(--line) 0 18px,transparent 18px 26px);border-radius:3px}
+.stop{position:relative;flex:1 0 108px;display:flex;flex-direction:column;align-items:center;gap:6px;background:none;border:0;cursor:pointer;padding:0 2px;min-height:96px}
+.stop .dot{position:relative;width:58px;height:58px;border-radius:50%;background:var(--panel);border:4px solid var(--line);display:grid;place-items:center;font-weight:900;font-size:1.25rem;z-index:1;transition:transform .2s}
+.stop .lbl{font-size:.88rem;color:var(--muted);text-align:center;font-weight:700}
+.stop.on .dot{border-color:var(--gold);background:var(--gold);color:var(--ink);transform:scale(1.08)}
+.stop.on .lbl{color:var(--snow)}
+.stop.done .dot{border-color:var(--crimson)}
+.stop.done .dot::after{content:"✔";position:absolute;top:-8px;right:-8px;background:var(--crimson);color:#fff;border-radius:50%;width:26px;height:26px;display:grid;place-items:center;font-size:.8rem}
+
+main{padding-bottom:110px}
+.st-head{display:flex;gap:18px;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;margin:10px 0 18px}
+.eyebrow{color:var(--gold);font-weight:700;font-size:.9rem;letter-spacing:.06em}
+.lead{color:var(--muted);margin-top:6px;max-width:62ch;font-size:1.05rem}
+.head-btns{display:flex;gap:10px;flex-wrap:wrap}
+
+.grid{display:grid;gap:18px}
+.two{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.three{grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+.four{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.stack{display:flex;flex-direction:column;gap:18px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.btn{min-height:60px;padding:10px 20px;border-radius:14px;border:2px solid var(--line);background:var(--panel-2);cursor:pointer;font-weight:700;font-size:1.05rem;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:transform .1s,background .2s,border-color .2s;text-decoration:none;color:var(--snow)}
+.btn:active{transform:scale(.96)}
+.btn.primary{background:var(--gold);border-color:var(--gold);color:var(--ink)}
+.btn.red{background:var(--crimson);border-color:var(--crimson);color:#fff}
+.btn.ghost{background:transparent}
+.btn.sel{border-color:var(--gold);box-shadow:0 0 0 3px rgba(226,189,98,.35) inset}
+.btn.ok{background:var(--good);border-color:var(--good);color:#0b2416}
+.btn.no{background:var(--bad);border-color:var(--bad);color:#2b0c08}
+.btn.big{min-height:84px;font-size:1.3rem;padding:12px 26px}
+.feedback{min-height:1.6em;font-weight:700;font-size:1.1rem}
+.feedback.good{color:var(--good)}
+.feedback.bad{color:var(--bad)}
+.chip{display:inline-flex;align-items:center;gap:10px;background:var(--panel-2);border-radius:999px;padding:8px 16px;font-weight:700}
+.muted{color:var(--muted)}
+.shake{animation:shake .4s}
+@keyframes shake{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+.pop{animation:pop .45s cubic-bezier(.2,1.6,.4,1)}
+@keyframes pop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+
+/* 정거장1 위치 */
+.compass{display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:auto auto auto;gap:10px;align-items:center;justify-items:center}
+.compass [data-d="북"]{grid-column:2;grid-row:1}
+.compass [data-d="서"]{grid-column:1;grid-row:2}
+.compass .center{grid-column:2;grid-row:2;background:var(--snow);color:var(--ink);font-weight:900;border-radius:14px;padding:16px 10px;text-align:center;width:100%}
+.compass [data-d="동"]{grid-column:3;grid-row:2}
+.compass [data-d="남"]{grid-column:2;grid-row:3}
+.compass .btn{width:100%}
+.sizegrid{display:grid;grid-template-columns:repeat(19,1fr);gap:3px}
+.sizegrid i{aspect-ratio:1;border-radius:3px;background:rgba(255,255,255,.07)}
+.sizegrid i.kr{background:var(--crimson);outline:2px solid #fff}
+.sizegrid i.ru{background:var(--ice)}
+.count{font-size:1.6rem;font-weight:900;font-variant-numeric:tabular-nums;color:var(--ice)}
+.route svg{width:100%;height:auto;display:block}
+.route text{fill:var(--snow);font-family:var(--body);font-weight:700}
+.flag{display:inline-block;width:48px;height:32px;border-radius:4px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.4)}
+.flag i{display:block;height:33.34%}
+
+/* 정거장2 날씨 */
+.thermo-wrap{position:relative;display:flex;gap:18px;align-items:center;justify-content:center;border-radius:14px;overflow:hidden;background:linear-gradient(#24365f,#101b36);padding:12px;min-height:330px}
+.thermo-wrap canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.thermo-wrap svg{height:300px;position:relative}
+.temp-big{position:relative;font-size:3.6rem;font-weight:900;font-variant-numeric:tabular-nums;color:var(--ice);min-width:3.6em;text-align:center}
+.suitcase{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;background:#5b3a26;border:6px solid #3c2617;border-radius:18px;padding:14px;position:relative}
+.suitcase::before{content:"";position:absolute;top:-26px;left:50%;width:90px;height:22px;margin-left:-45px;border:6px solid #3c2617;border-bottom:0;border-radius:12px 12px 0 0}
+.slot{aspect-ratio:1.3;border:2px dashed rgba(255,255,255,.3);border-radius:12px;display:grid;place-items:center;font-size:2.4rem}
+.slot.full{border-style:solid;border-color:var(--gold);background:rgba(255,255,255,.08)}
+.items{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px}
+.item{min-height:104px;flex-direction:column;gap:2px;font-size:.92rem}
+.item .ic{font-size:2.4rem;line-height:1}
+.item svg{width:46px;height:46px}
+.item.used{opacity:.25;pointer-events:none}
+
+/* 정거장3 문화 */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.tile{min-height:150px;flex-direction:column;gap:6px;border-radius:16px}
+.tile svg{width:78px;height:78px}
+.tile.seen{border-color:var(--crimson)}
+.stage{display:flex;align-items:flex-end;justify-content:center;gap:10px;min-height:300px;flex-wrap:wrap;padding:70px 0 10px}
+.doll{cursor:pointer;background:none;border:0;padding:0}
+.doll svg{display:block;overflow:visible}
+.doll .top{transition:transform .6s cubic-bezier(.3,1.4,.5,1)}
+.doll.open .top{transform:translate(-18px,-44px) rotate(-16deg)}
+.doll .hollow{opacity:0;transition:opacity .3s}
+.doll.open .hollow{opacity:1}
+.countru{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.countru span{background:var(--panel-2);border-radius:12px;padding:6px 14px;text-align:center;min-width:86px;opacity:.25;transition:opacity .3s}
+.countru span.lit{opacity:1;outline:2px solid var(--gold)}
+.countru b{display:block;font-family:var(--cyr);font-size:1.25rem}
+.bala-wrap{display:flex;gap:24px;align-items:center;flex-wrap:wrap;justify-content:center}
+.bala-wrap svg{width:200px;height:auto}
+.str{stroke:#f3e7c9;stroke-width:2.4}
+.hitstr{stroke:transparent;stroke-width:12;pointer-events:stroke;cursor:pointer}
+.str.vib{animation:vib .08s linear 6}
+@keyframes vib{50%{transform:translateX(2px)}}
+.cathedral svg{width:100%;max-width:520px;margin:0 auto;display:block}
+.dome{cursor:pointer;stroke:#3a1d12;stroke-width:2}
+.soup svg{width:260px;max-width:100%;margin:0 auto;display:block}
+
+/* 정거장4 말 */
+.words{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.word{flex-direction:column;align-items:flex-start;text-align:left;min-height:150px;gap:2px}
+.word .ru{font-family:var(--cyr);font-size:1.7rem;color:var(--gold);line-height:1.2}
+.word .pr{font-size:1.25rem;font-weight:900}
+.word .mean{color:var(--muted);font-weight:500}
+.word .ic{font-size:1.8rem;align-self:flex-end;margin-top:-6px}
+.qbox{display:flex;flex-direction:column;gap:14px;align-items:stretch}
+.qtext{font-size:1.45rem;font-weight:900;text-align:center}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.opt{min-height:110px;flex-direction:column;font-size:1.15rem}
+.opt .ic{font-size:2.4rem;line-height:1}
+.opt svg{width:56px;height:56px}
+.progress{display:flex;gap:6px;justify-content:center}
+.progress i{width:16px;height:16px;border-radius:50%;background:var(--line)}
+.progress i.g{background:var(--good)}
+.progress i.b{background:var(--bad)}
+
+/* 정거장5 차이콥스키 */
+.profile{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+.profile svg{width:150px;height:150px;flex:none}
+.profile .cyrname{font-family:var(--cyr);color:var(--gold);font-size:1.15rem}
+.timeline{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;position:relative}
+.tl{flex-direction:column;min-height:110px;gap:2px;font-size:.95rem}
+.tl b{font-size:1.4rem;color:var(--gold);font-variant-numeric:tabular-nums}
+.match{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.match .col{display:flex;flex-direction:column;gap:10px}
+.match .pic svg{width:80px;height:80px}
+.match .done{opacity:.55;border-color:var(--good)}
+
+/* 정거장6 발레 */
+.fig{width:100%;height:auto;max-height:230px}
+.fig .limbs line{stroke:var(--snow);stroke-width:11;stroke-linecap:round}
+.fig .headc{fill:var(--snow)}
+.fig .ground{stroke:var(--line);stroke-width:4}
+.fig .hat{fill:var(--crimson)}
+.poses{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.pose{flex-direction:column;min-height:200px;gap:4px;padding:10px}
+.pose svg{max-height:130px}
+.freeze{display:grid;grid-template-columns:minmax(260px,1fr) minmax(260px,1.2fr);gap:18px;align-items:center}
+.freeze-stage{background:var(--panel-2);border-radius:18px;min-height:380px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:16px;text-align:center;position:relative}
+.freeze-stage .fig{max-height:260px;width:auto;height:260px}
+.freeze-stage .pname{font-family:var(--display);font-size:2.2rem;color:var(--gold)}
+.ring{font-size:3rem;font-weight:900;width:92px;height:92px;border-radius:50%;border:6px solid var(--gold);display:grid;place-items:center;font-variant-numeric:tabular-nums}
+.beatdots{display:flex;gap:14px;justify-content:center}
+.beatdots i{width:34px;height:34px;border-radius:50%;background:var(--line);transition:transform .08s,background .08s}
+.beatdots i.hit{background:var(--gold);transform:scale(1.35)}
+.infocard svg{width:90px;height:90px}
+
+/* 정거장7 음악 */
+.facts{display:flex;gap:10px;flex-wrap:wrap}
+.form{display:flex;gap:6px;align-items:stretch}
+.form div{border-radius:10px;padding:12px 8px;text-align:center;font-weight:900;font-size:1.3rem;color:var(--ink)}
+.tabs{display:flex;gap:8px;flex-wrap:wrap}
+.tabs .btn{flex:1 1 140px}
+.rhythm{display:flex;gap:14px;align-items:flex-end;justify-content:center;padding:6px}
+.beat{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:62px}
+.beat .gl{height:58px;display:flex;align-items:center;gap:4px}
+.beat .ta{width:46px;height:46px;border-radius:50%;background:var(--gold)}
+.beat .ti{width:28px;height:28px;border-radius:50%;background:var(--ice)}
+.beat .rest{width:42px;height:42px;border-radius:8px;border:3px dashed var(--muted)}
+.beat .nm{font-weight:900}
+.beat .sym{font-size:1.5rem;color:var(--muted);line-height:1}
+.rhy-opt{flex-direction:column;padding:12px}
+.rhy-opt .rhythm{transform:scale(.85)}
+.slider{display:flex;flex-direction:column;gap:6px}
+.slider input{width:100%;height:44px;accent-color:var(--gold)}
+.dyn{font-family:var(--cyr);font-style:italic;font-size:2.4rem;color:var(--gold);min-width:2.2em;text-align:center}
+.tamb{width:190px;height:190px;border-radius:50%;border:14px solid #b8873e;background:radial-gradient(#f3e3c0,#dcc391);cursor:pointer;position:relative;display:grid;place-items:center;color:#5a3d14;font-weight:900;font-size:1.1rem}
+.tamb.hit{animation:tamb .18s}
+@keyframes tamb{50%{transform:rotate(-8deg) scale(.95)}}
+.dynbtn .ic{font-family:var(--cyr);font-style:italic}
+
+/* 정거장8 */
+.final-ticket{background:linear-gradient(120deg,#f6ecd2,#e9d6a6);color:#3a210f;border-radius:16px;display:flex;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.4);max-width:820px;margin:0 auto;width:100%}
+.final-ticket .l{flex:1;padding:22px 26px;display:flex;flex-direction:column;gap:6px;border-right:3px dashed #a7864a}
+.final-ticket .r{width:200px;padding:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center}
+.final-ticket .ru{font-family:var(--cyr);font-size:1.6rem;color:#8c1d27;letter-spacing:.05em}
+.final-ticket h3{color:#3a210f;font-size:1.6rem}
+.final-ticket input{font:inherit;font-size:1.4rem;font-weight:900;border:0;border-bottom:3px solid #8c1d27;background:transparent;color:#3a210f;width:100%;max-width:300px;padding:4px}
+.seal{width:120px;height:120px;border-radius:50%;border:5px double #b0242f;color:#b0242f;display:grid;place-items:center;font-weight:900;transform:rotate(-12deg);font-family:var(--display);font-size:1.05rem;text-align:center;line-height:1.2}
+
+/* 모달, 도장 */
+.overlay{position:fixed;inset:0;background:rgba(5,9,20,.72);display:none;align-items:center;justify-content:center;z-index:50;padding:18px}
+.overlay.show{display:flex}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:22px;max-width:720px;width:100%;max-height:86vh;overflow:auto;display:flex;flex-direction:column;gap:14px}
+.vlinks{display:grid;gap:10px}
+.vlink{justify-content:flex-start;text-align:left}
+.vlink small{display:block;color:var(--muted);font-weight:500}
+.stampfx{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:60;pointer-events:none;flex-direction:column;gap:12px}
+.stampfx.show{display:flex}
+.stampfx .big{width:230px;height:230px;border-radius:50%;border:10px double #ff6b78;color:#ff6b78;background:rgba(14,23,48,.85);display:grid;place-items:center;text-align:center;font-family:var(--display);font-size:2rem;line-height:1.2;animation:stamp .5s cubic-bezier(.2,1.5,.4,1) both;transform:rotate(-12deg)}
+@keyframes stamp{from{transform:scale(2.6) rotate(-12deg);opacity:0}to{transform:scale(1) rotate(-12deg);opacity:1}}
+#confetti{position:fixed;inset:0;pointer-events:none;z-index:55;width:100%;height:100%}
+.bottombar{position:fixed;left:0;right:0;bottom:0;background:rgba(14,23,48,.94);border-top:1px solid var(--line);z-index:20}
+.bottombar .wrap{display:flex;justify-content:space-between;gap:12px;padding-top:10px;padding-bottom:10px}
+.hidden{display:none!important}
+@media (max-width:720px){
+  h2{font-size:1.55rem}
+  .ticket{flex-direction:column}
+  .ticket .stub{width:auto;border-left:0;border-top:3px dashed rgba(255,255,255,.35)}
+  .freeze{grid-template-columns:1fr}
+  .final-ticket{flex-direction:column}
+  .final-ticket .l{border-right:0;border-bottom:3px dashed #a7864a}
+  .final-ticket .r{width:auto}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="ticket">
+    <div class="main">
+      <span class="kicker">음악 · 2차시 · 발레 음악 「호두까기 인형」</span>
+      <h1>트레팍 발레 열차 · 모스크바행</h1>
+      <span class="cyr">МОСКВА · ТРЕПАК · ЧАЙКОВСКИЙ</span>
+    </div>
+    <div class="stub">
+      <small>모은 도장</small>
+      <span class="stampcount" id="stampCount">0 / 8</span>
+      <div class="tools">
+        <button class="mini" id="ttsBtn" type="button">🔊 읽어주기 켜짐</button>
+        <button class="mini" id="resetBtn" type="button">↺ 처음부터</button>
+      </div>
+    </div>
+  </header>
+  <nav class="rail" id="rail" aria-label="정거장"></nav>
+  <main id="main"></main>
+</div>
+
+<div class="bottombar"><div class="wrap">
+  <button class="btn" id="prevBtn" type="button">◀ 이전 정거장</button>
+  <button class="btn primary" id="nextBtn" type="button">다음 정거장 ▶</button>
+</div></div>
+
+<div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
+<div class="stampfx" id="stampfx"><div class="big" id="stampBig">참 잘했어요</div></div>
+<canvas id="confetti"></canvas>
+
+<script>
+"use strict";
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+
+/* ---------- 타이머 관리 (정거장 이동 시 정리) ---------- */
+let timers=[]; let token=0;
+function later(fn,ms){const t=token;const id=setTimeout(()=>{if(t===token)fn()},ms);timers.push(id);return id}
+function clearTimers(){timers.forEach(clearTimeout);timers=[];token++}
+
+/* ---------- 음성(TTS) ---------- */
+let ttsOn=true; let voices=[];
+function loadVoices(){try{voices=speechSynthesis.getVoices()}catch(e){}}
+if('speechSynthesis' in window){loadVoices();speechSynthesis.onvoiceschanged=loadVoices}
+const voiceFor=l=>voices.find(v=>v.lang&&v.lang.replace('_','-').toLowerCase().startsWith(l));
+function say(text,lang='ko',rate=0.92){
+  if(!ttsOn||!('speechSynthesis' in window))return;
+  try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);const v=voiceFor(lang);u.lang=lang==='ru'?'ru-RU':'ko-KR';if(v)u.voice=v;u.rate=rate;speechSynthesis.speak(u)}catch(e){}
+}
+function sayRu(ru,ko){ if(voiceFor('ru')) say(ru,'ru',0.8); else say(ko,'ko',0.85) }
+
+/* ---------- 소리(Web Audio) ---------- */
+let AC=null,master=null,noiseBuf=null;const plCache={};
+function ac(){
+  if(!AC){AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=.9;master.connect(AC.destination);
+    noiseBuf=AC.createBuffer(1,AC.sampleRate,AC.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1}
+  if(AC.state==='suspended')AC.resume();return AC}
+function env(g,t,peak,dec){g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(Math.max(peak,.0002),t+.005);g.gain.exponentialRampToValueAtTime(.0001,t+dec)}
+function noise(t,type,freq,peak,dec,out){const a=ac();const s=a.createBufferSource();s.buffer=noiseBuf;const f=a.createBiquadFilter();f.type=type;f.frequency.value=freq;const g=a.createGain();env(g,t,peak,dec);s.connect(f).connect(g).connect(out||master);s.start(t);s.stop(t+dec+.05)}
+function tamb(t,v=1,out){noise(t,'highpass',7000,.55*v,.16,out);noise(t+.025,'bandpass',9000,.3*v,.12,out);noise(t+.05,'highpass',8000,.18*v,.1,out)}
+function kick(t,v=1,out){const a=ac();const o=a.createOscillator();const g=a.createGain();o.frequency.setValueAtTime(160,t);o.frequency.exponentialRampToValueAtTime(48,t+.14);env(g,t,.9*v,.28);o.connect(g).connect(out||master);o.start(t);o.stop(t+.3)}
+function snare(t,v=1,out){noise(t,'bandpass',1800,.5*v,.13,out)}
+function tone(t,f,v,dec,type='triangle',out){const a=ac();const o=a.createOscillator();o.type=type;o.frequency.value=f;const g=a.createGain();env(g,t,v,dec);o.connect(g).connect(out||master);o.start(t);o.stop(t+dec+.05)}
+function wood(t,v=1,out){tone(t,1050,.35*v,.05,'sine',out)}
+function pluckBuf(f){const k=Math.round(f);if(plCache[k])return plCache[k];const a=ac();const sr=a.sampleRate;const len=Math.floor(sr*1.4);const b=a.createBuffer(1,len,sr);const d=b.getChannelData(0);const N=Math.round(sr/f);for(let i=0;i<N;i++)d[i]=Math.random()*2-1;for(let i=N;i<len;i++)d[i]=.497*(d[i-N]+d[i-N-1]);plCache[k]=b;return b}
+function pluck(t,f,v=1,out){const a=ac();const s=a.createBufferSource();s.buffer=pluckBuf(f);const g=a.createGain();g.gain.value=.45*v;s.connect(g).connect(out||master);s.start(t)}
+function chime(){const a=ac();const t=a.currentTime;[523.3,659.3,784,1046.5].forEach((f,i)=>tone(t+i*.08,f,.25,.5,'sine'))}
+function buzz(){const a=ac();const t=a.currentTime;tone(t,220,.18,.2,'square');tone(t+.16,174.6,.18,.3,'square')}
+
+/* 러시아풍 반주 리듬(2/4박자): 쿵-짝 + 탬버린 + 발랄라이카 스트럼. 실제 트레팍 선율은 아님 */
+const Groove={playing:false,bpm:150,vol:.8,accel:false,step:0,next:0,timer:null,bus:null,onBeat:null,onTempo:null,
+  start(){const a=ac();if(this.playing)return;this.bus=a.createGain();this.bus.gain.value=this.vol;this.bus.connect(master);this.playing=true;this.step=0;this.next=a.currentTime+.06;this.timer=setInterval(()=>this.tick(),25)},
+  stop(){if(!this.playing)return;this.playing=false;clearInterval(this.timer);const b=this.bus;if(b){b.gain.setTargetAtTime(0,AC.currentTime,.03);setTimeout(()=>{try{b.disconnect()}catch(e){}},500)}this.accel=false},
+  setVol(v){this.vol=v;if(this.bus)this.bus.gain.setTargetAtTime(v,AC.currentTime,.05)},
+  tick(){while(this.next<AC.currentTime+.12){this.play(this.step,this.next);this.next+=60/this.bpm/2;this.step++;if(this.accel&&this.step%2===0){this.bpm=Math.min(230,this.bpm+3);this.onTempo&&this.onTempo(this.bpm)}}},
+  play(s,t){const i=s%4,bar=Math.floor(s/4)%4,G=bar<2,b=this.bus;
+    if(i===0){kick(t,1,b);tone(t,G?98:73.42,.5,.25,'triangle',b)}
+    if(i===2){snare(t,.75,b);tone(t,G?146.8:110,.45,.2,'triangle',b)}
+    if(i===1||i===3){tamb(t,.8,b);(G?[196,246.9,293.7]:[146.8,185,220]).forEach((f,k)=>pluck(t+k*.012,f,.55,b))}
+    if(i%2===0&&this.onBeat){const d=Math.max(0,(t-AC.currentTime)*1000);const n=i/2;setTimeout(()=>this.onBeat&&this.onBeat(n),d)}}
+};
+function playFor(sec,{bpm=150,vol=.8}={},done){Groove.stop();Groove.bpm=bpm;Groove.vol=vol;Groove.start();later(()=>{Groove.stop();done&&done()},sec*1000)}
+
+/* ---------- 도장 ---------- */
+const KEY='trepak2-stamps';
+let stamps={};try{stamps=JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch(e){stamps={}}
+function saveStamps(){try{localStorage.setItem(KEY,JSON.stringify(stamps))}catch(e){}}
+function award(id){
+  const st=STATIONS.find(s=>s.id===id);
+  if(stamps[id]){return}
+  stamps[id]=true;saveStamps();renderRail();
+  $('#stampBig').innerHTML=`${st.n}<br>참 잘했어요`;
+  const fx=$('#stampfx');fx.classList.add('show');chime();confetti();say(`${st.n} 도장을 받았어요. 참 잘했어요!`);
+  setTimeout(()=>fx.classList.remove('show'),2300);
+}
+function confetti(){
+  const c=$('#confetti');const x=c.getContext('2d');c.width=innerWidth;c.height=innerHeight;
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  const cols=['#e2bd62','#c8404d','#93c8ea','#f5f2ea','#5fcf8f'];
+  const P=Array.from({length:140},()=>({x:c.width/2,y:c.height/2,vx:(Math.random()-.5)*16,vy:Math.random()*-16-4,s:6+Math.random()*7,c:cols[Math.floor(Math.random()*5)],r:Math.random()*6}));
+  let f=0;(function run(){x.clearRect(0,0,c.width,c.height);P.forEach(p=>{p.vy+=.45;p.x+=p.vx;p.y+=p.vy;p.r+=.2;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.s/2,-p.s/4,p.s,p.s/2);x.restore()});if(++f<110)requestAnimationFrame(run);else x.clearRect(0,0,c.width,c.height)})();
+}
+
+/* ---------- 영상관 (유튜브 검색으로 연결) ---------- */
+const yt=q=>`https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
+const earth=q=>`https://earth.google.com/web/search/${encodeURIComponent(q)}`;
+const gac=q=>`https://artsandculture.google.com/search?q=${encodeURIComponent(q)}`;
+const VIDEOS={
+  loc:[['🌏 구글 어스로 모스크바 붉은 광장 가기','Google Earth 3D',earth('Red Square, Moscow')],['🌏 구글 어스로 블라디보스토크 가기','한국에서 가장 가까운 러시아 도시',earth('Vladivostok')],['🚂 시베리아 횡단 열차 여행','유튜브 검색',yt('시베리아 횡단열차 여행 풍경')],['🗺️ 러시아는 어떤 나라?','유튜브 검색',yt('러시아 나라 소개 지리')]],
+  weather:[['❄️ 영하 50도 야쿠츠크의 겨울','유튜브 검색',yt('야쿠츠크 영하 50도 겨울')],['🌨️ 눈 내리는 모스크바','유튜브 검색',yt('모스크바 겨울 눈 풍경')],['🧪 영하 40도에서 뜨거운 물 뿌리기','유튜브 검색',yt('영하 40도 뜨거운 물 뿌리기 시베리아')]],
+  culture:[['🪆 마트료시카 만드는 과정','유튜브 검색',yt('마트료시카 만드는 과정')],['🎸 발랄라이카 연주','유튜브 검색',yt('balalaika performance')],['⛪ 성 바실리 대성당 하늘에서 보기','유튜브 검색',yt("Saint Basil's Cathedral drone")],['🖼️ 구글 아트앤컬처: 성 바실리 대성당','Google Arts & Culture',gac("St. Basil's Cathedral")]],
+  lang:[['🗣️ 러시아어 인사말 배우기','유튜브 검색',yt('러시아어 인사말 기초')],['🔤 러시아 문자(키릴 문자) 알아보기','유튜브 검색',yt('키릴 문자 알파벳 읽는 법')]],
+  tchai:[['🎼 차이콥스키는 누구일까?','유튜브 검색',yt('차이콥스키 생애 쉽게')],['🦢 백조의 호수 (볼쇼이 발레단)','유튜브 검색',yt('Swan Lake Bolshoi ballet')],['🌹 잠자는 숲속의 미녀 왈츠','유튜브 검색',yt('Sleeping Beauty waltz Tchaikovsky ballet')]],
+  ballet:[['🩰 볼쇼이 발레단 호두까기 인형 트레팍','유튜브 검색',yt('Bolshoi Nutcracker Russian dance Trepak')],['🩰 마린스키 발레단 트레팍','유튜브 검색',yt('Mariinsky Nutcracker Trepak')],['👟 발레 기본 동작 (플리에·를르베)','유튜브 검색',yt('발레 기본 동작 플리에 를르베')],['🏛️ 구글 아트앤컬처: 볼쇼이 극장','Google Arts & Culture',gac('Bolshoi Theatre')]],
+  music:[['🎻 오케스트라로 듣는 트레팍','유튜브 검색',yt('Tchaikovsky Trepak orchestra')],['📈 트레팍 그림 악보(리스닝 맵)','유튜브 검색',yt('Trepak listening map')],['🥁 트레팍 탬버린 플레이 어롱','유튜브 검색',yt('Trepak tambourine play along')]],
+  bolshoi:[['🏛️ 볼쇼이 극장 내부 둘러보기','유튜브 검색',yt('Bolshoi Theatre inside tour')],['🎄 호두까기 인형 2막 전체','유튜브 검색',yt('Nutcracker Act 2 Bolshoi')]]
+};
+function openVideos(id){
+  const st=STATIONS.find(s=>s.id===id);
+  $('#modal').innerHTML=`<div class="row" style="justify-content:space-between"><h3>▶ 영상관 · ${st.n}</h3><button class="btn" data-close>닫기 ✕</button></div>
+  <p class="muted">유튜브 검색 결과나 구글 어스로 새 창에서 열려요. 수업 전에 선생님이 영상을 골라 두면 광고 없이 바로 보여 줄 수 있어요.</p>
+  <div class="vlinks">${VIDEOS[id].map(v=>`<a class="btn vlink" href="${v[2]}" target="_blank" rel="noopener"><span>${v[0]}<small>${v[1]}</small></span></a>`).join('')}</div>`;
+  $('#overlay').classList.add('show');
+}
+document.addEventListener('click',e=>{
+  const s=e.target.closest('[data-say]');if(s)say(s.dataset.say);
+  const v=e.target.closest('[data-video]');if(v)openVideos(v.dataset.video);
+  if(e.target.closest('[data-close]')||e.target.id==='overlay')$('#overlay').classList.remove('show');
+});
+
+/* ---------- 공통 그림 ---------- */
+const USHANKA=`<svg viewBox="0 0 60 60"><path d="M10 34 Q10 8 30 8 Q50 8 50 34Z" fill="#6b4a2f"/><rect x="6" y="28" width="48" height="12" rx="6" fill="#d9c7a7"/><rect x="6" y="36" width="12" height="18" rx="6" fill="#d9c7a7"/><rect x="42" y="36" width="12" height="18" rx="6" fill="#d9c7a7"/><circle cx="30" cy="20" r="4" fill="#e2bd62"/></svg>`;
+function dollSVG(i,color,size){
+  const w=100*size,h=140*size;
+  return `<svg width="${w}" height="${h}" viewBox="0 0 100 140" aria-hidden="true">
+  <defs><clipPath id="ct${i}"><rect x="-20" y="-20" width="140" height="94"/></clipPath><clipPath id="cb${i}"><rect x="-20" y="74" width="140" height="90"/></clipPath></defs>
+  ${['b','t'].map(part=>`<g class="${part==='t'?'top':'bot'}" clip-path="url(#c${part}${i})" style="transform-origin:20px 74px">
+    <path d="M50 4 C30 4 21 20 24 40 C9 60 9 106 21 126 C30 138 70 138 79 126 C91 106 91 60 76 40 C79 20 70 4 50 4Z" fill="${color}" stroke="#2a1410" stroke-width="2"/>
+    <ellipse cx="50" cy="34" rx="19" ry="18" fill="#fff3df"/>
+    <ellipse cx="50" cy="35" rx="14" ry="13" fill="#f6d9bf"/>
+    <circle cx="44" cy="33" r="2" fill="#2a1410"/><circle cx="56" cy="33" r="2" fill="#2a1410"/>
+    <circle cx="41" cy="39" r="3" fill="#f39a9a"/><circle cx="59" cy="39" r="3" fill="#f39a9a"/>
+    <path d="M46 42 Q50 45 54 42" stroke="#b0242f" stroke-width="2" fill="none"/>
+    <path d="M38 22 Q50 15 62 22" stroke="#2a1410" stroke-width="3" fill="none"/>
+    <ellipse cx="50" cy="96" rx="22" ry="28" fill="#fff3df"/>
+    <circle cx="50" cy="94" r="9" fill="${color}"/><circle cx="50" cy="94" r="4" fill="#e2bd62"/>
+    <circle cx="39" cy="110" r="5" fill="#5fcf8f"/><circle cx="61" cy="110" r="5" fill="#5fcf8f"/>
+  </g>`).join('')}
+  <ellipse class="hollow" cx="50" cy="74" rx="27" ry="5" fill="#2a1410"/>
+  </svg>`;
+}
+const BALA=`<svg viewBox="0 0 220 360" aria-label="발랄라이카">
+<defs><linearGradient id="wood" x1="0" x2="1"><stop offset="0" stop-color="#c58a3f"/><stop offset=".5" stop-color="#e7b56a"/><stop offset="1" stop-color="#b47630"/></linearGradient></defs>
+<rect x="98" y="2" width="24" height="42" rx="4" fill="#5a3518"/>
+<circle cx="94" cy="14" r="4" fill="#e2bd62"/><circle cx="126" cy="14" r="4" fill="#e2bd62"/><circle cx="94" cy="32" r="4" fill="#e2bd62"/>
+<rect x="101" y="40" width="18" height="150" fill="#6b4220"/>
+${[60,85,110,135,160].map(y=>`<line x1="101" y1="${y}" x2="119" y2="${y}" stroke="#d9c7a7" stroke-width="2"/>`).join('')}
+<path d="M110 168 L26 330 Q110 356 194 330 Z" fill="url(#wood)" stroke="#5a3518" stroke-width="5" stroke-linejoin="round"/>
+<circle cx="110" cy="250" r="13" fill="#3a210f"/>
+<rect x="84" y="312" width="52" height="8" rx="3" fill="#3a210f"/>
+<line class="str" data-s="0" x1="105" y1="20" x2="97" y2="314"/>
+<line class="str" data-s="1" x1="110" y1="20" x2="110" y2="314"/>
+<line class="str" data-s="2" x1="115" y1="20" x2="123" y2="314"/>
+<line class="hitstr" data-s="0" x1="99" y1="170" x2="90" y2="314"/>
+<line class="hitstr" data-s="1" x1="110" y1="170" x2="110" y2="314"/>
+<line class="hitstr" data-s="2" x1="121" y1="170" x2="130" y2="314"/>
+</svg>`;
+const DOME_PAL=[['#e2bd62','#2f8a5a'],['#c8404d','#f5f2ea'],['#2f6db3','#f5f2ea'],['#3f9a6a','#f1d36b'],['#e07b2f','#2f6db3'],['#8e3fa0','#e2bd62']];
+function onion(cx,base,w,h){return `M${cx-w*.35} ${base} C${cx-w*.78} ${base-h*.32} ${cx-w*.5} ${base-h*.72} ${cx} ${base-h} C${cx+w*.5} ${base-h*.72} ${cx+w*.78} ${base-h*.32} ${cx+w*.35} ${base}Z`}
+function cathedralSVG(){
+  const domes=[{cx:105,b:170,w:66,h:74},{cx:295,b:170,w:66,h:74},{cx:152,b:132,w:50,h:60},{cx:248,b:132,w:50,h:60},{cx:200,b:70,w:42,h:52}];
+  const pats=DOME_PAL.map((p,i)=>`<pattern id="dp${i}" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(35)"><rect width="14" height="14" fill="${p[0]}"/><rect width="7" height="14" fill="${p[1]}"/></pattern>`).join('');
+  return `<svg viewBox="0 0 400 300" aria-label="성 바실리 대성당"><defs>${pats}</defs>
+  <rect x="0" y="282" width="400" height="18" fill="#7a2a24"/>
+  <rect x="50" y="190" width="300" height="94" fill="#b5473f" stroke="#5a1f19" stroke-width="2"/>
+  ${[80,130,180,230,280,320].map(x=>`<path d="M${x} 284 V240 Q${x+10} 226 ${x+20} 240 V284Z" fill="#e8d9b5"/>`).join('')}
+  <rect x="180" y="70" width="40" height="122" fill="#c95d4f" stroke="#5a1f19" stroke-width="2"/>
+  ${domes.map(d=>`<rect x="${d.cx-d.w*.28}" y="${d.b}" width="${d.w*.56}" height="${190-d.b+4}" fill="#d76b55" stroke="#5a1f19" stroke-width="2"/>`).join('')}
+  ${domes.map((d,i)=>`<line x1="${d.cx}" y1="${d.b-d.h}" x2="${d.cx}" y2="${d.b-d.h-16}" stroke="#e2bd62" stroke-width="3"/><line x1="${d.cx-6}" y1="${d.b-d.h-10}" x2="${d.cx+6}" y2="${d.b-d.h-10}" stroke="#e2bd62" stroke-width="3"/><path class="dome" data-i="${i}" data-c="${i%DOME_PAL.length}" d="${onion(d.cx,d.b,d.w,d.h)}" fill="url(#dp${i%DOME_PAL.length})"/>`).join('')}
+  </svg>`;
+}
+const SOUP=`<svg viewBox="0 0 260 180" aria-label="보르시">
+<ellipse cx="130" cy="78" rx="112" ry="30" fill="#e8e1d2"/>
+<ellipse id="soupTop" cx="130" cy="80" rx="98" ry="22" fill="#e9b48f"/>
+<path d="M18 80 Q24 160 130 166 Q236 160 242 80" fill="#f2ede2" stroke="#c9bfa8" stroke-width="3"/>
+<path d="M40 100 Q130 116 220 100" stroke="#2f6db3" stroke-width="5" fill="none"/>
+<ellipse cx="120" cy="78" rx="22" ry="8" fill="#fff"/>
+<circle cx="150" cy="74" r="3" fill="#3f9a6a"/><circle cx="160" cy="82" r="3" fill="#3f9a6a"/><circle cx="96" cy="84" r="3" fill="#3f9a6a"/><circle cx="140" cy="88" r="3" fill="#3f9a6a"/>
+</svg>`;
+const BEET=`<svg viewBox="0 0 60 60"><path d="M30 20 C14 20 10 40 30 54 C50 40 46 20 30 20Z" fill="#8c1d4f"/><path d="M30 20 L22 4 M30 20 L30 2 M30 20 L38 4" stroke="#3f9a6a" stroke-width="4" stroke-linecap="round"/></svg>`;
+const SWAN=`<svg viewBox="0 0 100 100"><path d="M10 82 Q50 92 90 82" stroke="#93c8ea" stroke-width="4" fill="none"/><path d="M22 72 Q30 50 60 58 Q84 62 80 72 Z" fill="#f5f2ea"/><path d="M58 60 Q46 40 56 26 Q64 16 70 24" stroke="#f5f2ea" stroke-width="7" fill="none" stroke-linecap="round"/><circle cx="70" cy="24" r="6" fill="#f5f2ea"/><path d="M75 23 L86 26 L75 28Z" fill="#e07b2f"/></svg>`;
+const ROSE=`<svg viewBox="0 0 100 100"><path d="M50 52 V94" stroke="#3f9a6a" stroke-width="5"/><path d="M50 74 Q30 64 26 76 Q38 84 50 78" fill="#3f9a6a"/><circle cx="50" cy="36" r="22" fill="#c8404d"/><path d="M38 34 Q50 20 62 34 Q50 46 38 34" fill="#e8687a"/><circle cx="50" cy="34" r="6" fill="#a02a3a"/><text x="74" y="22" font-size="16">💤</text></svg>`;
+const NUT=`<svg viewBox="0 0 100 100"><rect x="36" y="4" width="28" height="22" rx="3" fill="#2a1410"/><rect x="34" y="24" width="32" height="4" fill="#e2bd62"/><circle cx="50" cy="38" r="12" fill="#f6d9bf"/><rect x="40" y="44" width="20" height="8" fill="#f5f2ea"/><rect x="34" y="52" width="32" height="26" rx="4" fill="#c8404d"/><line x1="50" y1="52" x2="50" y2="78" stroke="#e2bd62" stroke-width="3"/><rect x="37" y="78" width="10" height="16" fill="#2f3f74"/><rect x="53" y="78" width="10" height="16" fill="#2f3f74"/><circle cx="45" cy="36" r="2"/><circle cx="55" cy="36" r="2"/></svg>`;
+const BOLSHOI=`<svg viewBox="0 0 100 100"><path d="M10 34 L50 12 L90 34Z" fill="#e8d9b5"/><rect x="12" y="34" width="76" height="6" fill="#d2bf91"/>${[16,26,36,46,56,66,76].map(x=>`<rect x="${x}" y="40" width="6" height="42" fill="#f5f2ea"/>`).join('')}<rect x="8" y="82" width="84" height="6" fill="#d2bf91"/><rect x="4" y="88" width="92" height="6" fill="#bfa978"/><circle cx="50" cy="26" r="4" fill="#e2bd62"/></svg>`;
+const TUTU=`<svg viewBox="0 0 100 100"><path d="M38 20 Q50 14 62 20 L60 48 L40 48Z" fill="#f2b8c6"/><ellipse cx="50" cy="56" rx="44" ry="12" fill="#f8d5de"/><ellipse cx="50" cy="52" rx="36" ry="9" fill="#f2b8c6"/><path d="M42 20 L40 8 M58 20 L60 8" stroke="#f2b8c6" stroke-width="4"/></svg>`;
+const DANCER=`<svg viewBox="0 0 100 100"><circle cx="50" cy="16" r="8" fill="#f5f2ea"/><path d="M50 24 V54" stroke="#f5f2ea" stroke-width="6" stroke-linecap="round"/><path d="M50 30 Q30 18 34 6 M50 30 Q70 18 66 6" stroke="#f5f2ea" stroke-width="5" fill="none" stroke-linecap="round"/><ellipse cx="50" cy="56" rx="24" ry="6" fill="#f2b8c6"/><path d="M46 58 L44 92 M54 58 L58 92" stroke="#f5f2ea" stroke-width="5" stroke-linecap="round"/></svg>`;
+const MEDAL=`<svg viewBox="0 0 150 150" aria-hidden="true"><circle cx="75" cy="75" r="70" fill="#21315a" stroke="#e2bd62" stroke-width="4"/><circle cx="75" cy="75" r="60" fill="none" stroke="#e2bd62" stroke-width="1.5" stroke-dasharray="3 5"/>${[52,62,72,82,92].map(y=>`<line x1="28" y1="${y}" x2="122" y2="${y}" stroke="#33477a" stroke-width="2"/>`).join('')}<text x="75" y="88" text-anchor="middle" font-family="Playfair Display,serif" font-size="34" fill="#e2bd62">П.И.Ч.</text><text x="75" y="122" text-anchor="middle" font-size="13" fill="#aab4cd" font-family="sans-serif">1840 — 1893</text></svg>`;
+
+/* 막대 인형 포즈 */
+function fig(p,extra=''){
+  const L=(a,b)=>`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}"/>`;
+  return `<svg viewBox="0 0 200 240" class="fig" aria-hidden="true"><line class="ground" x1="16" y1="230" x2="184" y2="230"/><g class="limbs">${L(p.nk,p.hp)}${L(p.nk,p.lE)}${L(p.lE,p.lH)}${L(p.nk,p.rE)}${L(p.rE,p.rH)}${L(p.hp,p.lK)}${L(p.lK,p.lF)}${L(p.hp,p.rK)}${L(p.rK,p.rF)}${(p.x||[]).map(s=>L(s[0],s[1])).join('')}</g><circle class="headc" cx="${p.hd[0]}" cy="${p.hd[1]}" r="16"/>${extra}</svg>`;
+}
+const POSES=[
+  {n:'플리에',en:'Plié',d:'무릎을 바깥쪽으로 굽혀요.',s:'의자에 앉아 무릎을 벌리고, 팔은 아래로 둥글게.',p:{hd:[100,58],nk:[100,78],hp:[100,140],lE:[76,108],lH:[92,134],rE:[124,108],rH:[108,134],lK:[66,172],lF:[86,226],rK:[134,172],rF:[114,226]}},
+  {n:'를르베',en:'Relevé',d:'발뒤꿈치를 들고, 팔은 머리 위로 둥글게!',s:'앉아서 발뒤꿈치만 들고 팔을 올려요.',p:{hd:[100,34],nk:[100,54],hp:[100,120],lE:[72,36],lH:[92,10],rE:[128,36],rH:[108,10],lK:[96,168],lF:[97,212],rK:[104,168],rF:[103,212],x:[[[97,212],[94,226]],[[103,212],[106,226]]]}},
+  {n:'아라베스크',en:'Arabesque',d:'한 다리를 뒤로 쭉, 팔은 앞뒤로 길게.',s:'앉아서 한 팔은 앞으로, 한 팔은 뒤로 뻗어요.',p:{hd:[124,50],nk:[112,68],hp:[94,124],rE:[140,60],rH:[172,48],lE:[86,74],lH:[56,72],rK:[96,176],rF:[98,226],lK:[56,118],lF:[18,110]}},
+  {n:'앙 아방',en:'En avant',d:'팔을 앞으로 둥글게, 큰 공을 안듯이.',s:'앉아서 똑같이 팔을 둥글게 모아요.',p:{hd:[100,34],nk:[100,54],hp:[100,124],lE:[70,84],lH:[94,104],rE:[130,84],rH:[106,104],lK:[94,176],lF:[92,226],rK:[106,176],rF:[108,226]}},
+  {n:'트레팍 점프',en:'Jump',d:'팔을 V자로 뻗고 힘차게 점프!',s:'앉아서 두 팔을 V자로 번쩍!',p:{hd:[100,26],nk:[100,46],hp:[100,108],lE:[72,30],lH:[52,8],rE:[128,30],rH:[148,8],lK:[72,138],lF:[50,164],rK:[128,138],rF:[150,164]}},
+  {n:'쪼그려 발차기',en:'Prisyadka',d:'트레팍 남자 무용수 동작! 팔짱 끼고 한 발 차기.',s:'앉아서 팔짱 끼고 한 발씩 앞으로 차요.',p:{hd:[98,92],nk:[96,112],hp:[92,176],lE:[76,132],lH:[116,126],rE:[118,132],rH:[78,126],lK:[122,168],lF:[104,226],rK:[140,196],rF:[184,206]}},
+  {n:'레베랑스(인사)',en:'Révérence',d:'공연이 끝나면 정중하게 인사해요.',s:'앉아서 상체를 숙여 인사해요.',p:{hd:[150,72],nk:[134,86],hp:[96,128],rE:[148,114],rH:[154,142],lE:[108,94],lH:[72,106],lK:[86,178],lF:[78,226],rK:[110,178],rF:[122,226]}},
+  {n:'호두까기 병정',en:'Soldier',d:'몸을 꼿꼿이 세우고 경례!',s:'앉아서 허리를 펴고 경례!',p:{hd:[100,46],nk:[100,66],hp:[100,134],lE:[84,98],lH:[84,132],rE:[130,60],rH:[114,40],lK:[95,180],lF:[95,226],rK:[105,180],rF:[105,226]},extra:'<rect class="hat" x="86" y="6" width="28" height="26" rx="3"/>'}
+];
+const poseSVG=p=>fig(p.p,p.extra||'');
+
+/* ---------- 정거장 ---------- */
+const STATIONS=[
+  {id:'loc',n:'위치',title:'러시아는 어디에 있을까?',r:renderLoc},
+  {id:'weather',n:'날씨',title:'러시아의 겨울은 얼마나 추울까?',r:renderWeather},
+  {id:'culture',n:'문화',title:'러시아 문화 상자 열기',r:renderCulture},
+  {id:'lang',n:'러시아 말',title:'러시아 말로 인사해요',r:renderLang},
+  {id:'tchai',n:'차이콥스키',title:'작곡가 차이콥스키를 만나요',r:renderTchai},
+  {id:'ballet',n:'발레',title:'발레 동작 배우고 멈춰! 게임',r:renderBallet},
+  {id:'music',n:'음악 탐정',title:'트레팍 음악 탐정',r:renderMusic},
+  {id:'bolshoi',n:'볼쇼이 극장',title:'볼쇼이 극장 입장 퀴즈',r:renderFinal}
+];
+let cur=0;
+function renderRail(){
+  $('#rail').innerHTML=STATIONS.map((s,i)=>`<button class="stop ${i===cur?'on':''} ${stamps[s.id]?'done':''}" data-go="${i}" type="button" aria-current="${i===cur}"><span class="dot">${i+1}</span><span class="lbl">${s.n}</span></button>`).join('');
+  const n=STATIONS.filter(s=>stamps[s.id]).length;$('#stampCount').textContent=`${n} / ${STATIONS.length}`;
+}
+$('#rail').addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(b)go(+b.dataset.go)});
+function go(i){
+  Groove.stop();Groove.onBeat=null;Groove.onTempo=null;clearTimers();try{speechSynthesis.cancel()}catch(e){}
+  cur=Math.max(0,Math.min(STATIONS.length-1,i));renderRail();
+  const st=STATIONS[cur];const m=$('#main');m.innerHTML='';st.r(m,st);
+  $('#prevBtn').style.visibility=cur===0?'hidden':'visible';
+  $('#nextBtn').style.visibility=cur===STATIONS.length-1?'hidden':'visible';
+  window.scrollTo(0,0);
+  try{history.replaceState(null,'','#'+st.id)}catch(e){}
+  const on=$('#rail .on');if(on)on.scrollIntoView({inline:'center',block:'nearest'});
+}
+$('#prevBtn').onclick=()=>go(cur-1);$('#nextBtn').onclick=()=>go(cur+1);
+$('#ttsBtn').onclick=()=>{ttsOn=!ttsOn;$('#ttsBtn').textContent=ttsOn?'🔊 읽어주기 켜짐':'🔇 읽어주기 꺼짐';if(!ttsOn)try{speechSynthesis.cancel()}catch(e){}};
+$('#resetBtn').onclick=()=>{
+  $('#modal').innerHTML=`<h3>도장을 모두 지울까요?</h3><p>다음 반 수업을 위해 모은 도장을 지우고 1번 정거장으로 돌아가요.</p><div class="row"><button class="btn red" id="doReset">네, 지울게요</button><button class="btn" data-close>아니요</button></div>`;
+  $('#overlay').classList.add('show');
+  $('#doReset').onclick=()=>{stamps={};saveStamps();$('#overlay').classList.remove('show');go(0)};
+};
+function head(st,intro){
+  return `<header class="st-head"><div><p class="eyebrow">정거장 ${STATIONS.indexOf(st)+1} · ${st.n}</p><h2>${st.title}</h2><p class="lead">${intro}</p></div>
+  <div class="head-btns"><button class="btn ghost" type="button" data-say="${esc(st.title+'. '+intro)}">🔊 읽어주기</button><button class="btn red" type="button" data-video="${st.id}">▶ 영상관</button></div></header>`;
+}
+function fb(el,ok,text){el.className='feedback '+(ok?'good':'bad');el.textContent=text}
+
+/* ===== 1. 위치 ===== */
+function renderLoc(m,st){
+  m.innerHTML=head(st,'러시아는 우리나라 북쪽에 있는, 세계에서 가장 넓은 나라예요. 세 가지 활동을 모두 하면 도장을 받아요.')+`
+  <div class="stack">
+  <div class="grid two">
+    <div class="card"><h3>① 어느 쪽에 있을까?</h3><p>러시아는 대한민국의 어느 쪽에 있을까요? 방향을 눌러 보세요.</p>
+      <div class="compass">
+        <button class="btn dir" data-d="북" type="button">▲ 북쪽</button>
+        <button class="btn dir" data-d="서" type="button">◀ 서쪽</button>
+        <div class="center">대한민국</div>
+        <button class="btn dir" data-d="동" type="button">동쪽 ▶</button>
+        <button class="btn dir" data-d="남" type="button">▼ 남쪽</button>
+      </div><p class="feedback" id="dirFb"></p></div>
+    <div class="card"><h3>② 얼마나 넓을까?</h3><p>빨간 칸 1개가 대한민국 크기라면, 러시아는 몇 칸일까요?</p>
+      <div class="sizegrid" id="sizeGrid">${'<i></i>'.repeat(171)}</div>
+      <div class="row"><button class="btn primary" id="sizeBtn" type="button">크기 비교하기</button><span class="count" id="sizeCount"></span></div>
+      <p class="feedback" id="sizeFb"></p></div>
+  </div>
+  <div class="card route"><h3>③ 모스크바까지 가 볼까요?</h3><p>탈것을 골라 출발해요. 모스크바는 러시아의 수도예요.</p>
+    <div class="row"><button class="btn big" data-mode="plane" type="button">✈️ 비행기로</button><button class="btn big" data-mode="train" type="button">🚂 시베리아 횡단 열차로</button></div>
+    <svg viewBox="0 0 1000 190" id="routeSvg">
+      <path id="rpath" d="M60 130 L940 130" stroke="#33477a" stroke-width="8" fill="none" stroke-dasharray="20 10"/>
+      ${[[60,'대전'],[210,'인천공항'],[430,'블라디보스토크'],[940,'모스크바']].map(([x,t])=>`<circle cx="${x}" cy="130" r="14" fill="${t==='모스크바'?'#c8404d':'#e2bd62'}"/><text x="${x}" y="172" text-anchor="middle" font-size="24">${t}</text>`).join('')}
+      <path id="leg" d="" stroke="#e2bd62" stroke-width="5" fill="none"/>
+      <text id="veh" x="60" y="118" font-size="44" text-anchor="middle">🚌</text>
+      <text id="legLbl" x="500" y="40" text-anchor="middle" font-size="26" fill="#93c8ea"></text>
+    </svg>
+    <p class="feedback" id="routeFb"></p></div>
+  <div class="card"><h3>러시아 한눈에 보기</h3>
+    <div class="facts">
+      <span class="chip"><span class="flag"><i style="background:#fff"></i><i style="background:#1c57a5"></i><i style="background:#d52b1e"></i></span>국기: 하양·파랑·빨강</span>
+      <span class="chip">🏛️ 수도: 모스크바</span>
+      <span class="chip">🕐 시간대가 11개! 서쪽이 아침일 때 동쪽은 저녁</span>
+      <span class="chip">🗣️ 러시아어 · 키릴 문자</span>
+    </div>
+    <div class="row"><a class="btn" href="${earth('Red Square, Moscow')}" target="_blank" rel="noopener">🌏 구글 어스로 모스크바 가 보기</a></div></div>
+  </div>`;
+  const done={dir:false,size:false,route:false};
+  const check=()=>{if(done.dir&&done.size&&done.route)setTimeout(()=>award('loc'),900)};
+  $$('.dir',m).forEach(b=>b.onclick=()=>{
+    ac();const ok=b.dataset.d==='북';
+    if(ok){b.className='btn dir ok';b.textContent='▲ 북쪽 · 러시아';fb($('#dirFb'),true,'정답! 러시아는 우리나라 북쪽에 있어요.');chime();say('정답! 러시아는 우리나라 북쪽에 있어요.');done.dir=true;check()}
+    else{b.classList.add('shake');later(()=>b.classList.remove('shake'),400);fb($('#dirFb'),false,`${b.dataset.d}쪽이 아니에요. 다시 골라 볼까요?`);buzz()}
+  });
+  $('#sizeBtn').onclick=()=>{
+    ac();const cells=$$('#sizeGrid i');cells.forEach(c=>c.className='');cells[0].className='kr';
+    let k=1;$('#sizeBtn').disabled=true;say('빨간 칸이 대한민국이에요. 러시아는 몇 칸일까요?');
+    const step=()=>{if(k<171){cells[k].className='ru';$('#sizeCount').textContent=`러시아 ${k}칸`;if(k%10===0)tone(ac().currentTime,300+k*4,.08,.06,'sine');k++;later(step,22)}else{$('#sizeCount').textContent='약 170칸!';fb($('#sizeFb'),true,'러시아는 대한민국보다 약 170배 넓어요. 세계에서 가장 넓은 나라!');say('러시아는 대한민국보다 약 백칠십 배 넓어요. 세계에서 가장 넓은 나라예요!');chime();$('#sizeBtn').disabled=false;done.size=true;check()}};
+    later(step,700);
+  };
+  const legs={
+    plane:[['🚌','M60 130 L210 130','대전 → 인천공항: 버스 약 2시간'],['✈️','M210 130 Q575 -40 940 130','인천 → 모스크바: 비행기 약 9시간']],
+    train:[['🚌','M60 130 L210 130','대전 → 인천공항: 버스 약 2시간'],['✈️','M210 130 Q320 50 430 130','인천 → 블라디보스토크: 비행기 약 2시간 30분'],['🚂','M430 130 L940 130','블라디보스토크 → 모스크바: 기차로 약 7일 (9,288km)']]
+  };
+  let busy=false;
+  $$('[data-mode]',m).forEach(b=>b.onclick=()=>{
+    if(busy)return;busy=true;ac();$$('[data-mode]',m).forEach(x=>x.classList.remove('sel'));b.classList.add('sel');
+    const L=legs[b.dataset.mode];let li=0;const leg=$('#leg'),veh=$('#veh'),lbl=$('#legLbl');
+    const runLeg=()=>{
+      if(li>=L.length){busy=false;const t=b.dataset.mode==='plane'?'비행기로 하루 안에 도착!':'기차로 7일이나 걸려요. 정말 넓은 나라죠?';fb($('#routeFb'),true,'모스크바 도착! '+t);say('모스크바에 도착했어요! '+t);chime();done.route=true;check();return}
+      const [ic,d,text]=L[li];leg.setAttribute('d',d);veh.textContent=ic;lbl.textContent=text;say(text.replace('→','에서').replace(':',','));
+      const len=leg.getTotalLength();const dur=li===L.length-1&&ic==='🚂'?4200:2600;const t0=performance.now();const myTok=token;
+      const fr=now=>{if(myTok!==token)return;const p=Math.min(1,(now-t0)/dur);const pt=leg.getPointAtLength(len*p);veh.setAttribute('x',pt.x);veh.setAttribute('y',pt.y-12);if(ic==='🚂'&&Math.random()<.06)wood(ac().currentTime,.4);if(p<1)requestAnimationFrame(fr);else{li++;later(runLeg,500)}};
+      requestAnimationFrame(fr);
+    };runLeg();
+  });
+}
+
+/* ===== 2. 날씨 ===== */
+function renderWeather(m,st){
+  const cities=[
+    {n:'대전',t:-1,f:'우리 학교가 있는 대전의 1월 평균 기온은 약 -1℃예요.',snow:12},
+    {n:'모스크바',t:-6,f:'러시아의 수도 모스크바는 1월 평균 약 -6℃. 추운 날은 -20℃ 아래로 내려가고, 11월부터 3월까지 눈이 쌓여 있어요.',snow:70},
+    {n:'야쿠츠크',t:-39,f:'시베리아의 야쿠츠크는 1월 평균 약 -39℃! 세계에서 가장 추운 도시 중 하나예요. 내쉰 숨이 바로 얼어요.',snow:220}
+  ];
+  const items=shuffle([
+    {k:'털모자(우샨카)',svg:USHANKA,ok:true,m:'털모자 우샨카! 귀까지 따뜻하게 덮어 줘요.'},
+    {k:'두꺼운 패딩',ic:'🧥',ok:true,m:'두꺼운 패딩, 좋아요!'},
+    {k:'장갑',ic:'🧤',ok:true,m:'장갑, 좋아요! 손이 얼지 않게.'},
+    {k:'목도리',ic:'🧣',ok:true,m:'목도리, 좋아요!'},
+    {k:'털부츠',ic:'🥾',ok:true,m:'털부츠, 좋아요! 눈길에도 미끄럽지 않게.'},
+    {k:'두꺼운 양말',ic:'🧦',ok:true,m:'두꺼운 양말, 좋아요!'},
+    {k:'반팔 티셔츠',ic:'👕',ok:false,m:'반팔 티셔츠는 너무 추워요!'},
+    {k:'반바지',ic:'🩳',ok:false,m:'반바지는 모스크바 겨울에 너무 추워요!'},
+    {k:'슬리퍼',ic:'🩴',ok:false,m:'슬리퍼로 눈길을 걸으면 발이 꽁꽁 얼어요!'},
+    {k:'수영복',ic:'🩱',ok:false,m:'수영복은 여름 바다에 가져가요!'},
+    {k:'파라솔',ic:'⛱️',ok:false,m:'파라솔은 여름 해변 물건이에요!'},
+    {k:'빙수',ic:'🍧',ok:false,m:'빙수는 너무 차가워요!'}
+  ]);
+  m.innerHTML=head(st,'러시아는 겨울이 길고 아주 추워요. 기온을 비교하고, 모스크바 겨울 여행 캐리어를 싸 봐요.')+`
+  <div class="grid two">
+    <div class="card"><h3>① 1월 기온 비교</h3>
+      <div class="thermo-wrap"><canvas id="snowC"></canvas>
+        <svg viewBox="0 0 120 360" aria-label="온도계">
+          <rect x="44" y="12" width="32" height="290" rx="16" fill="#f5f2ea"/>
+          <rect id="merc" x="52" y="200" width="16" height="110" fill="#c8404d"/>
+          <circle cx="60" cy="318" r="30" fill="#c8404d" stroke="#f5f2ea" stroke-width="6"/>
+          ${[20,10,0,-10,-20,-30,-40,-50].map(v=>{const y=20+(20-v)/70*270;return `<line x1="78" y1="${y}" x2="90" y2="${y}" stroke="#f5f2ea" stroke-width="2"/><text x="93" y="${y+5}" font-size="13" fill="#f5f2ea" font-family="sans-serif">${v}</text>`}).join('')}
+        </svg>
+        <div class="temp-big" id="tempBig">-1℃</div>
+      </div>
+      <div class="row">${cities.map((c,i)=>`<button class="btn big" data-city="${i}" type="button">${c.n}</button>`).join('')}</div>
+      <p id="cityFact" class="lead" style="color:var(--snow)">도시를 눌러 기온을 비교해 보세요.</p>
+    </div>
+    <div class="card"><h3>② 모스크바 겨울 여행 캐리어 싸기</h3><p>모스크바 겨울에 꼭 필요한 물건 <b>6개</b>를 골라 캐리어에 넣어요.</p>
+      <div class="suitcase" id="suit" style="margin-top:22px">${'<div class="slot"></div>'.repeat(6)}</div>
+      <p class="feedback" id="packFb"></p>
+      <div class="items">${items.map((it,i)=>`<button class="btn item" data-it="${i}" type="button">${it.svg?it.svg:`<span class="ic">${it.ic}</span>`}<span>${it.k}</span></button>`).join('')}</div>
+    </div>
+  </div>`;
+  // 온도계
+  const merc=$('#merc');let curT=-1;
+  const yOf=v=>20+(20-v)/70*270;
+  const setMerc=v=>{const y=yOf(v);merc.setAttribute('y',y);merc.setAttribute('height',312-y);$('#tempBig').textContent=Math.round(v)+'℃'};
+  setMerc(-1);
+  let snowN=12;
+  $$('[data-city]',m).forEach(b=>b.onclick=()=>{
+    ac();const c=cities[+b.dataset.city];$$('[data-city]',m).forEach(x=>x.classList.remove('sel'));b.classList.add('sel');
+    $('#cityFact').textContent=c.f;say(c.f.replace(/-/g,'영하 ').replace(/℃/g,'도'));snowN=c.snow;
+    const from=curT,to=c.t,t0=performance.now(),myTok=token;
+    const fr=now=>{if(myTok!==token)return;const p=Math.min(1,(now-t0)/1200);const e=1-Math.pow(1-p,3);curT=from+(to-from)*e;setMerc(curT);if(p<1)requestAnimationFrame(fr)};requestAnimationFrame(fr);
+    tone(ac().currentTime,to<-20?220:440,.12,.4,'sine');
+  });
+  // 눈
+  const cv=$('#snowC'),cx=cv.getContext('2d');const flakes=[];const myTok=token;
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  (function snow(){if(myTok!==token)return;const w=cv.clientWidth,h=cv.clientHeight;if(cv.width!==w)cv.width=w;if(cv.height!==h)cv.height=h;
+    while(flakes.length<snowN)flakes.push({x:Math.random()*w,y:Math.random()*-h,r:1+Math.random()*3,v:.6+Math.random()*1.6});
+    if(flakes.length>snowN)flakes.length=snowN;
+    cx.clearRect(0,0,w,h);cx.fillStyle='rgba(255,255,255,.9)';
+    const wind=snowN>100?1.6:.3;
+    flakes.forEach(f=>{if(!reduce){f.y+=f.v*(snowN>100?2:1);f.x+=wind+Math.sin(f.y/30)*.4}if(f.y>h){f.y=-5;f.x=Math.random()*w}if(f.x>w)f.x=0;cx.beginPath();cx.arc(f.x,f.y,f.r,0,7);cx.fill()});
+    requestAnimationFrame(snow)})();
+  // 캐리어
+  let filled=0;
+  $$('[data-it]',m).forEach(b=>b.onclick=()=>{
+    ac();const it=items[+b.dataset.it];
+    if(it.ok){const slot=$$('#suit .slot')[filled++];slot.innerHTML=it.svg?it.svg.replace('<svg','<svg width="52" height="52"'):it.ic;slot.classList.add('full','pop');b.classList.add('used');chime();fb($('#packFb'),true,it.m);say(it.m);
+      if(filled===6){later(()=>{fb($('#packFb'),true,'캐리어 완성! 이제 추운 모스크바도 걱정 없어요.');say('캐리어 완성! 이제 추운 모스크바도 걱정 없어요.');award('weather')},1200)}}
+    else{b.classList.add('shake');later(()=>b.classList.remove('shake'),400);buzz();fb($('#packFb'),false,it.m);say(it.m)}
+  });
+}
+
+/* ===== 3. 문화 ===== */
+function renderCulture(m,st){
+  const T=[
+    {k:'doll',n:'마트료시카',svg:dollSVG('t0','#c8404d',.5)},
+    {k:'bala',n:'발랄라이카',svg:BALA},
+    {k:'dome',n:'양파 지붕 성당',svg:cathedralSVG()},
+    {k:'soup',n:'보르시',svg:BEET}
+  ];
+  m.innerHTML=head(st,'러시아의 인형, 악기, 건물, 음식을 만나요. 상자 3개 이상을 열면 도장을 받아요.')+`
+  <div class="stack">
+    <div class="tiles">${T.map(t=>`<button class="btn tile" data-t="${t.k}" type="button">${t.svg.replace(/id="(ct|cb)t0"/g,'id="$1tile"').replace(/url\(#(ct|cb)t0\)/g,'url(#$1tile)')}<span>${t.n}</span></button>`).join('')}</div>
+    <div class="card" id="cPanel"><p class="muted">위의 상자를 눌러 보세요.</p></div>
+  </div>`;
+  // 타일 안의 그림은 작게
+  $$('.tile svg',m).forEach(s=>{s.removeAttribute('width');s.removeAttribute('height')});
+  const seen=new Set();
+  const panel=$('#cPanel');
+  const open=k=>{
+    seen.add(k);$(`[data-t="${k}"]`,m).classList.add('seen');$$('.tile',m).forEach(x=>x.classList.toggle('sel',x.dataset.t===k));
+    ({doll:showDoll,bala:showBala,dome:showDome,soup:showSoup})[k](panel);
+    if(seen.size>=3)setTimeout(()=>award('culture'),4000);
+  };
+  $$('.tile',m).forEach(b=>b.onclick=()=>{ac();open(b.dataset.t)});
+}
+function showDoll(p){
+  const cols=['#c8404d','#2f6db3','#e2a93b','#3f9a6a','#8e3fa0'],sizes=[1.5,1.25,1.02,.82,.62];
+  const ru=[['один','아진'],['два','드바'],['три','뜨리'],['четыре','치띠리'],['пять','뺘찌']];
+  p.innerHTML=`<h3>🪆 마트료시카 — 인형 안에 인형이!</h3>
+  <p>러시아의 나무 인형이에요. 큰 인형을 열면 더 작은 인형이 나와요. 인형을 눌러 열고, 러시아 말로 숫자를 세어 봐요!</p>
+  <div class="stage" id="dStage"></div>
+  <div class="countru">${ru.map((r,i)=>`<span data-n="${i}"><b>${r[0]}</b>${r[1]} · ${i+1}</span>`).join('')}</div>
+  <div class="row"><button class="btn" id="dReset" type="button">↺ 다시 닫기</button></div>`;
+  const stage=$('#dStage');let n=0;
+  const add=()=>{const b=document.createElement('button');b.className='doll pop';b.type='button';b.innerHTML=dollSVG('d'+n,cols[n],sizes[n]);b.dataset.n=n;stage.appendChild(b);
+    $$('.countru span')[n].classList.add('lit');sayRu(ru[n][0],ru[n][1]);tone(ac().currentTime,[392,440,494,523,587][n],.2,.4,'sine');
+    if(n===4){b.querySelector('.top').style.clipPath='none';b.querySelector('.hollow').remove()}
+    b.onclick=()=>{const i=+b.dataset.n;if(i!==n||i===4||b.classList.contains('open'))return;b.classList.add('open');wood(ac().currentTime,1);n++;later(add,550)};n=+b.dataset.n};
+  add();
+  $('#dReset').onclick=()=>{stage.innerHTML='';$$('.countru span').forEach(s=>s.classList.remove('lit'));n=0;add()};
+}
+function showBala(p){
+  p.innerHTML=`<h3>🎸 발랄라이카 — 세모 모양 러시아 기타</h3>
+  <div class="bala-wrap">${BALA}
+   <div class="stack" style="flex:1;min-width:260px">
+    <p>줄이 <b>3개</b>인 러시아 전통 현악기예요. 몸통이 <b>세모 모양</b>! 줄을 손가락으로 튕겨서 연주해요. 트레팍 같은 러시아 민속춤 음악에 잘 어울려요.</p>
+    <div class="row">${['1번 줄 (미)','2번 줄 (미)','3번 줄 (라)'].map((t,i)=>`<button class="btn big" data-str="${i}" type="button">${t}</button>`).join('')}</div>
+    <div class="row"><button class="btn primary big" id="strum" type="button">🎶 한꺼번에 퉁기기</button><button class="btn big" id="tremolo" type="button">〰️ 빠르게 떨기(트레몰로)</button></div>
+   </div></div>`;
+  const F=[329.6,329.6,440];
+  const hit=i=>{pluck(ac().currentTime,F[i],1);const s=$(`.str[data-s="${i}"]`,p);s.classList.remove('vib');void s.getBoundingClientRect();s.classList.add('vib')};
+  $$('[data-str]',p).forEach(b=>b.onclick=()=>hit(+b.dataset.str));
+  $$('.hitstr',p).forEach(s=>s.onclick=()=>hit(+s.dataset.s));
+  const strum=()=>{const t=ac().currentTime;[2,1,0].forEach((i,k)=>{pluck(t+k*.03,F[i],1)});$$('.str',p).forEach(s=>{s.classList.remove('vib');void s.getBoundingClientRect();s.classList.add('vib')})};
+  $('#strum').onclick=strum;
+  $('#tremolo').onclick=()=>{const t=ac().currentTime;for(let k=0;k<16;k++)[0,1,2].forEach((i,j)=>pluck(t+k*.09+j*.015,[392,493.9,587.3][i],.7))};
+  say('발랄라이카는 줄이 세 개인 러시아 악기예요. 줄을 눌러 소리를 들어 보세요.');
+}
+function showDome(p){
+  p.innerHTML=`<h3>⛪ 성 바실리 대성당 — 알록달록 양파 지붕</h3>
+  <p>모스크바 <b>붉은 광장</b>에 있는 성당이에요. 지붕이 <b>양파</b>처럼 생겼어요. 지붕을 눌러 나만의 색으로 꾸며 보세요!</p>
+  <div class="cathedral">${cathedralSVG()}</div>
+  <div class="row"><a class="btn" href="${earth("Saint Basil's Cathedral, Moscow")}" target="_blank" rel="noopener">🌏 구글 어스로 진짜 성당 보기</a></div>`;
+  $$('.dome',p).forEach(d=>d.onclick=()=>{const c=(+d.dataset.c+1)%DOME_PAL.length;d.dataset.c=c;d.setAttribute('fill',`url(#dp${c})`);tone(ac().currentTime,[523,587,659,784,880][+d.dataset.i],.2,.3,'sine')});
+  say('성 바실리 대성당은 모스크바 붉은 광장에 있어요. 양파 모양 지붕을 눌러 색을 바꿔 보세요.');
+}
+function showSoup(p){
+  p.innerHTML=`<h3>🍲 보르시 — 빨간 채소 수프</h3>
+  <div class="grid two" style="align-items:center"><div class="soup">${SOUP}</div>
+  <div class="stack"><p><b>비트(사탕무)</b>라는 빨간 채소로 끓인 수프예요. 하얀 <b>사워크림</b>을 올려 먹어요. 러시아와 우크라이나 등에서 즐겨 먹는 음식이에요.</p>
+  <div class="row"><button class="btn big" id="beetBtn" type="button">${BEET.replace('<svg','<svg width="40" height="40"')} 비트 넣기</button></div><p class="feedback" id="soupFb"></p></div></div>`;
+  let n=0;const steps=['#e9b48f','#d9776f','#c2414f','#9a1f3c'];
+  $('#beetBtn').onclick=()=>{n=Math.min(3,n+1);$('#soupTop').setAttribute('fill',steps[n]);tone(ac().currentTime,300+n*80,.2,.3,'sine');
+    if(n===3){fb($('#soupFb'),true,'완성! 비트 덕분에 새빨간 보르시가 되었어요.');say('완성! 비트 덕분에 새빨간 보르시가 되었어요.')}else fb($('#soupFb'),true,`비트 ${n}개! 점점 빨개져요.`)};
+}
+
+/* ===== 4. 러시아 말 ===== */
+const WORDS=[
+  {ru:'Привет',ko:'프리비엣',m:'안녕',ic:'👋'},
+  {ru:'Спасибо',ko:'스파시바',m:'고마워요',ic:'🙏'},
+  {ru:'Да',ko:'다',m:'네',ic:'⭕'},
+  {ru:'Нет',ko:'니엣',m:'아니요',ic:'❌'},
+  {ru:'Балет',ko:'발레트',m:'발레',ic:'🩰'},
+  {ru:'Музыка',ko:'무지카',m:'음악',ic:'🎵'},
+  {ru:'До свидания',ko:'다스비다니야',m:'안녕히 가세요',ic:'🚪'},
+  {ru:'Ура!',ko:'우라!',m:'만세!',ic:'🎉'}
+];
+function renderLang(m,st){
+  m.innerHTML=head(st,'러시아 사람들은 러시아어를 쓰고, 키릴 문자로 글을 써요. 카드를 눌러 소리를 듣고 따라 말해 봐요.')+`
+  <div class="stack">
+   <div class="words">${WORDS.map((w,i)=>`<button class="btn word" data-w="${i}" type="button"><span class="ru">${w.ru}</span><span class="pr">${w.ko}</span><span class="mean">${w.m}</span><span class="ic">${w.ic}</span></button>`).join('')}</div>
+   <div class="card"><h3>듣고 뜻 고르기 게임</h3><div id="lgame" class="qbox"><button class="btn primary big" id="lStart" type="button">▶ 게임 시작 (5문제)</button></div></div>
+  </div>`;
+  $$('[data-w]',m).forEach(b=>b.onclick=()=>{const w=WORDS[+b.dataset.w];sayRu(w.ru,w.ko)});
+  $('#lStart').onclick=()=>{
+    const qs=shuffle(WORDS).slice(0,5).map(w=>({w,opts:shuffle([w,...shuffle(WORDS.filter(x=>x!==w)).slice(0,2)])}));
+    quiz($('#lgame'),qs.map(q=>({
+      q:'🔊 소리를 듣고 뜻을 골라요',
+      onShow:()=>sayRu(q.w.ru,q.w.ko),
+      replay:()=>sayRu(q.w.ru,q.w.ko),
+      sub:`<span style="font-family:var(--cyr);font-size:2rem;color:var(--gold)">${q.w.ru}</span>`,
+      opts:q.opts.map(o=>({h:`<span class="ic">${o.ic}</span>${o.m}`,ok:o===q.w})),
+      good:`정답! ${q.w.ko}는 "${q.w.m}"이라는 뜻이에요.`
+    })),score=>{award('lang');return `5문제 중 ${score}개 정답! 스파시바(고마워요)!`});
+  };
+}
+
+/* 공용 퀴즈 */
+function quiz(box,Q,onEnd){
+  let i=0,score=0;const res=[];
+  const show=()=>{
+    if(i>=Q.length){const msg=onEnd(score);box.innerHTML=`<p class="qtext">${msg}</p><div class="progress">${res.map(r=>`<i class="${r?'g':'b'}"></i>`).join('')}</div>`;say(msg.replace(/<[^>]+>/g,''));return}
+    const q=Q[i];
+    box.innerHTML=`<div class="progress">${Q.map((_,k)=>`<i class="${k<i?(res[k]?'g':'b'):''}"></i>`).join('')}</div>
+     <p class="qtext">${q.q}</p>${q.sub?`<div style="text-align:center">${q.sub}</div>`:''}
+     ${q.replay?`<div class="row" style="justify-content:center"><button class="btn" data-rep type="button">🔊 다시 듣기</button></div>`:''}
+     <div class="opts">${q.opts.map((o,k)=>`<button class="btn opt" data-o="${k}" type="button">${o.h}</button>`).join('')}</div>
+     <p class="feedback" data-fb></p>`;
+    if(q.replay)$('[data-rep]',box).onclick=q.replay;
+    let answered=false;
+    $$('[data-o]',box).forEach(b=>b.onclick=()=>{
+      if(answered)return;const o=q.opts[+b.dataset.o];ac();
+      if(o.ok){answered=true;b.classList.add('ok');if(res[i]===undefined){res[i]=true;score++}chime();const g=q.good||'정답!';fb($('[data-fb]',box),true,g);say(g);later(()=>{i++;show()},1900)}
+      else{if(res[i]===undefined)res[i]=false;b.classList.add('no','shake');buzz();fb($('[data-fb]',box),false,'다시 한 번 골라 볼까요?')}
+    });
+    if(q.onShow)later(q.onShow,300);else say(q.q.replace(/<[^>]+>/g,''));
+  };show();
+}
+
+/* ===== 5. 차이콥스키 ===== */
+function renderTchai(m,st){
+  const TL=[[1840,'러시아 봇킨스크에서 태어났어요'],[1859,'법을 공부하고 공무원으로 일했어요'],[1862,'22살, 음악 학교에 들어가 작곡가의 꿈을 키웠어요'],[1877,'발레 「백조의 호수」 첫 공연'],[1890,'발레 「잠자는 숲속의 미녀」 첫 공연'],[1892,'발레 「호두까기 인형」 첫 공연 (상트페테르부르크)']];
+  const B=[{n:'백조의 호수',svg:SWAN},{n:'잠자는 숲속의 미녀',svg:ROSE},{n:'호두까기 인형',svg:NUT}];
+  m.innerHTML=head(st,'호두까기 인형을 만든 러시아 작곡가 차이콥스키! 그가 만든 3대 발레 음악도 알아봐요.')+`
+  <div class="stack">
+   <div class="card"><div class="profile">${MEDAL}<div class="stack" style="gap:6px;flex:1;min-width:240px">
+     <h3 style="font-size:1.8rem;color:var(--snow)">표트르 일리치 차이콥스키</h3>
+     <span class="cyrname">Пётр Ильич Чайковский</span>
+     <p>러시아의 작곡가 (1840~1893). 아름답고 기억하기 쉬운 선율로 유명해요. 발레 음악, 교향곡, 협주곡 등을 남겼어요.</p></div></div></div>
+   <div class="card"><h3>차이콥스키의 일생 — 눌러서 들어 보기</h3>
+     <div class="timeline">${TL.map(([y,t])=>`<button class="btn tl" type="button" data-say="${y}년. ${esc(t)}"><b>${y}</b><span>${t}</span></button>`).join('')}</div></div>
+   <div class="card"><h3>차이콥스키 3대 발레 — 짝 맞추기</h3><p>제목을 먼저 누르고, 어울리는 그림을 눌러요.</p>
+     <div class="match"><div class="col" id="mL">${shuffle(B).map(b=>`<button class="btn big" data-n="${b.n}" type="button">${b.n}</button>`).join('')}</div>
+     <div class="col" id="mR">${shuffle(B).map(b=>`<button class="btn pic" data-n="${b.n}" type="button" aria-label="${b.n} 그림">${b.svg}</button>`).join('')}</div></div>
+     <p class="feedback" id="mFb"></p></div>
+  </div>`;
+  let pick=null,count=0;
+  $$('#mL .btn',m).forEach(b=>b.onclick=()=>{if(b.classList.contains('done'))return;$$('#mL .btn',m).forEach(x=>x.classList.remove('sel'));b.classList.add('sel');pick=b;say(b.dataset.n)});
+  $$('#mR .btn',m).forEach(b=>b.onclick=()=>{
+    if(!pick||b.classList.contains('done'))return;ac();
+    if(pick.dataset.n===b.dataset.n){[pick,b].forEach(x=>{x.classList.add('done');x.classList.remove('sel')});chime();count++;
+      const t={'백조의 호수':'백조로 변한 공주 이야기예요.','잠자는 숲속의 미녀':'100년 동안 잠든 공주 이야기예요.','호두까기 인형':'우리가 배우는 트레팍이 나오는 발레예요!'}[b.dataset.n];
+      fb($('#mFb'),true,`${b.dataset.n} — ${t}`);say(`${b.dataset.n}. ${t}`);pick=null;
+      if(count===3)setTimeout(()=>award('tchai'),2400)}
+    else{b.classList.add('shake');later(()=>b.classList.remove('shake'),400);buzz();fb($('#mFb'),false,'다른 그림을 골라 볼까요?')}
+  });
+}
+
+/* ===== 6. 발레 ===== */
+function renderBallet(m,st){
+  const INFO=[
+    {n:'발레리나 · 발레리노',d:'여자 무용수는 발레리나, 남자 무용수는 발레리노라고 불러요.',svg:DANCER},
+    {n:'토슈즈',d:'발끝으로 설 수 있게 만든 딱딱한 발레 신발이에요.',svg:'<svg viewBox="0 0 100 100"><text x="50" y="70" font-size="62" text-anchor="middle">🩰</text></svg>'},
+    {n:'튀튀',d:'동그랗게 펴지는 짧은 발레 치마예요.',svg:TUTU},
+    {n:'볼쇼이 극장',d:'모스크바에 있는 유명한 극장. "볼쇼이"는 러시아 말로 "크다"는 뜻!',svg:BOLSHOI}
+  ];
+  m.innerHTML=head(st,'트레팍은 호두까기 인형 2막 「과자의 나라」에서 추는 힘찬 러시아 춤이에요. 발레 동작을 배우고, 음악이 멈추면 포즈를 해요!')+`
+  <div class="stack">
+   <div class="grid four">${INFO.map(x=>`<button class="btn card infocard" style="align-items:center;text-align:center" type="button" data-say="${esc(x.n+'. '+x.d)}">${x.svg}<h3>${x.n}</h3><span class="muted" style="font-weight:500">${x.d}</span></button>`).join('')}</div>
+   <div class="card"><h3>① 발레 포즈 카드 — 눌러서 크게 보기</h3>
+     <div class="poses">${POSES.map((p,i)=>`<button class="btn pose" data-p="${i}" type="button">${poseSVG(p)}<b>${p.n}</b><small class="muted">${p.en}</small></button>`).join('')}</div></div>
+   <div class="card"><h3>② 멈춰! 발레 포즈 게임</h3>
+     <div class="freeze">
+       <div class="stack">
+         <p>음악이 흐르면 자유롭게 움직이다가, <b>음악이 멈추면</b> 화면에 나온 포즈로 <b>5초 동안</b> 멈춰요. 4번 성공하면 도장!</p>
+         <div class="row"><button class="btn sel" data-fm="auto" type="button">🥁 내장 리듬으로</button><button class="btn" data-fm="teacher" type="button">🎻 진짜 음악(선생님)</button></div>
+         <p class="muted" id="fmHelp">앱이 러시아풍 리듬을 틀다가 아무 때나 멈춰요.</p>
+         <div class="row"><button class="btn primary big" id="fStart" type="button">▶ 시작</button><button class="btn big" id="fStop" type="button">■ 그만</button></div>
+         <label class="row" style="gap:8px"><input type="checkbox" id="seated" style="width:28px;height:28px"> 앉아서 하는 방법 보여 주기</label>
+         <p class="chip" style="align-self:flex-start">성공 <span id="fCount">0</span> / 4</p>
+       </div>
+       <div class="freeze-stage" id="fStage"><div class="beatdots"><i></i><i></i></div><p class="pname">준비!</p><p class="muted">시작 버튼을 눌러요</p></div>
+     </div></div>
+  </div>`;
+  $$('[data-p]',m).forEach(b=>b.onclick=()=>{const p=POSES[+b.dataset.p];
+    $('#modal').innerHTML=`<div class="row" style="justify-content:space-between"><h3>${p.n} <span class="muted">${p.en}</span></h3><button class="btn" data-close type="button">닫기 ✕</button></div><div style="max-width:320px;margin:0 auto;width:100%">${poseSVG(p)}</div><p style="font-size:1.3rem;font-weight:700;text-align:center">${p.d}</p><p class="muted" style="text-align:center">🪑 ${p.s}</p>`;
+    $('#overlay').classList.add('show');say(`${p.n}. ${p.d}`)});
+  let mode='auto',running=false,count=0,last=-1;
+  const stage=$('#fStage');
+  $$('[data-fm]',m).forEach(b=>b.onclick=()=>{mode=b.dataset.fm;$$('[data-fm]',m).forEach(x=>x.classList.toggle('sel',x===b));
+    $('#fmHelp').textContent=mode==='auto'?'앱이 러시아풍 리듬을 틀다가 아무 때나 멈춰요.':'선생님이 다른 창에서 트레팍을 틀고, 음악을 멈출 때 아래 「멈춰!」 버튼을 눌러요.';stop()});
+  const dancing=()=>{stage.innerHTML=`<div class="beatdots"><i></i><i></i></div><p class="pname">춤춰요! 💃🕺</p><p class="muted">${mode==='auto'?'음악이 멈추면 포즈!':'선생님이 음악을 멈추면 버튼을 눌러요'}</p>${mode==='teacher'?'<button class="btn red big" id="fFreeze" type="button">✋ 멈춰! 포즈 뽑기</button>':''}`;
+    if(mode==='teacher')$('#fFreeze').onclick=freeze;};
+  Groove.onBeat=n=>{const d=$$('.beatdots i',stage);if(!d.length)return;d.forEach(x=>x.classList.remove('hit'));if(d[n])d[n].classList.add('hit')};
+  const freeze=()=>{
+    Groove.stop();let k;do{k=Math.floor(Math.random()*POSES.length)}while(k===last);last=k;const p=POSES[k];const seated=$('#seated').checked;
+    stage.innerHTML=`${poseSVG(p)}<p class="pname">${p.n}!</p><p style="font-weight:700">${seated?'🪑 '+p.s:p.d}</p><div class="ring" id="ring">5</div>`;
+    say(`멈춰! ${p.n}! ${seated?p.s:p.d}`);
+    let c=5;const tick=()=>{c--;const r=$('#ring');if(!r)return;if(c>0){r.textContent=c;wood(ac().currentTime,.6);later(tick,1000)}else{r.textContent='👏';chime();count++;$('#fCount').textContent=count;
+      if(count===4){award('ballet')}
+      later(()=>{if(running)next()},1300)}};
+    later(tick,2200);
+  };
+  const next=()=>{dancing();if(mode==='auto'){Groove.bpm=152;Groove.vol=.8;Groove.start();later(freeze,5000+Math.random()*5000)}};
+  const stop=()=>{running=false;Groove.stop();clearTimers();stage.innerHTML='<div class="beatdots"><i></i><i></i></div><p class="pname">준비!</p><p class="muted">시작 버튼을 눌러요</p>'};
+  $('#fStart').onclick=()=>{ac();if(running)return;running=true;next();stage.scrollIntoView({block:'center',behavior:'smooth'})};
+  $('#fStop').onclick=stop;
+}
+
+/* ===== 7. 음악 탐정 ===== */
+const RHY=[['ti','ti','ta','ta'],['ta','ti','ta','r'],['ti','ta','ti','ta'],['ta','ta','ti','ta'],['ti','ti','ti','r']];
+function rhyHTML(p){return `<div class="rhythm">${p.map(b=>`<div class="beat"><div class="gl">${b==='ta'?'<i class="ta"></i>':b==='ti'?'<i class="ti"></i><i class="ti"></i>':'<i class="rest"></i>'}</div><span class="sym">${b==='ta'?'♩':b==='ti'?'♫':'𝄽'}</span><span class="nm">${b==='ta'?'타':b==='ti'?'티티':'쉼'}</span></div>`).join('')}</div>`}
+function playRhy(p,bpm=88){const a=ac();const sp=60/bpm;const t0=a.currentTime+.15;p.forEach((b,i)=>{const t=t0+i*sp;wood(t,.35);if(b==='ta')tamb(t,1.1);if(b==='ti'){tamb(t,1.1);tamb(t+sp/2,1.1)}});return p.length*sp}
+function renderMusic(m,st){
+  m.innerHTML=head(st,'트레팍에는 어떤 음악 요소가 숨어 있을까요? 빠르기, 셈여림, 리듬 문제를 풀고 지휘자가 되어 봐요. 6문제를 맞히면 도장!')+`
+  <div class="stack">
+   <div class="card"><h3>트레팍 음악 카드</h3>
+     <div class="facts">
+       <span class="chip">⏱️ 빠르기: 매우 빠르고 생기 있게 <i class="muted">(molto vivace)</i></span>
+       <span class="chip">💪 셈여림: 대부분 세게 <span class="dyn" style="font-size:1.4rem">f</span></span>
+       <span class="chip">🎵 2/4박자 · 쿵-짝</span>
+       <span class="chip">🥁 탬버린이 신나게!</span>
+       <span class="chip">⏳ 약 1분의 짧은 곡</span>
+     </div>
+     <p style="font-weight:700">곡의 짜임(형식)</p>
+     <div class="form"><div style="flex:3;background:var(--gold)">A</div><div style="flex:2;background:var(--ice)">B</div><div style="flex:3;background:var(--gold)">A</div><div style="flex:1.4;background:var(--crimson);color:#fff">코다<br><small>점점 빠르게!</small></div></div>
+   </div>
+   <div class="card"><div class="row" style="justify-content:space-between"><h3>음악 탐정 문제</h3><span class="chip">맞힌 문제 <span id="mScore">0</span> / 6</span></div>
+     <div class="tabs">${[['tempo','⏱️ 빠르기'],['dyn','🔊 셈여림'],['rhy','🥁 리듬'],['cond','🎼 지휘자 되기']].map(([k,t],i)=>`<button class="btn ${i===0?'sel':''}" data-tab="${k}" type="button">${t}</button>`).join('')}</div>
+     <div id="mBox" class="qbox" style="margin-top:8px"></div></div>
+  </div>`;
+  let total=0;const plus=()=>{total++;$('#mScore').textContent=Math.min(total,6);if(total===6)setTimeout(()=>award('music'),1500)};
+  const box=$('#mBox');
+  const tabs={
+    tempo(){
+      const T=[{k:'slow',n:'느리게',it:'Adagio',bpm:62,ic:'🐢'},{k:'mid',n:'보통 빠르게',it:'Moderato',bpm:104,ic:'🚶'},{k:'fast',n:'매우 빠르게',it:'Vivace',bpm:176,ic:'🏃'}];
+      let ans=null;
+      box.innerHTML=`<p class="qtext">음악을 듣고 빠르기를 골라요</p><div class="row" style="justify-content:center"><button class="btn primary big" id="tPlay" type="button">▶ 음악 듣기</button></div>
+      <div class="opts">${T.map(t=>`<button class="btn opt" data-k="${t.k}" type="button"><span class="ic">${t.ic}</span>${t.n}<small class="muted"><i>${t.it}</i></small></button>`).join('')}</div><p class="feedback" data-fb></p>`;
+      $('#tPlay').onclick=()=>{ans=T[Math.floor(Math.random()*3)];$$('.opt',box).forEach(b=>b.className='btn opt');playFor(5,{bpm:ans.bpm,vol:.8});fb($('[data-fb]',box),true,'')};
+      $$('.opt',box).forEach(b=>b.onclick=()=>{if(!ans){fb($('[data-fb]',box),false,'먼저 ▶ 음악 듣기를 눌러요.');return}
+        if(b.dataset.k===ans.k){b.classList.add('ok');chime();plus();const g=ans.k==='fast'?'정답! 트레팍처럼 매우 빠르게!':`정답! ${ans.n}였어요.`;fb($('[data-fb]',box),true,g+' 다시 ▶를 눌러 다음 문제!');say(g);ans=null;Groove.stop()}
+        else{b.classList.add('no','shake');buzz();fb($('[data-fb]',box),false,'다시 들어 볼까요?')}});
+    },
+    dyn(){
+      let ans=null;
+      box.innerHTML=`<p class="qtext">음악을 듣고 셈여림을 골라요</p><div class="row" style="justify-content:center"><button class="btn primary big" id="dPlay" type="button">▶ 음악 듣기</button></div>
+      <div class="opts"><button class="btn opt dynbtn" data-k="p" type="button"><span class="ic" style="font-size:1.6rem">p</span>여리게 (피아노)</button><button class="btn opt dynbtn" data-k="f" type="button"><span class="ic" style="font-size:3.4rem">f</span>세게 (포르테)</button></div><p class="feedback" data-fb></p>`;
+      $('#dPlay').onclick=()=>{ans=Math.random()<.5?'p':'f';$$('.opt',box).forEach(b=>b.className='btn opt dynbtn');playFor(4,{bpm:150,vol:ans==='p'?.14:1.1})};
+      $$('.opt',box).forEach(b=>b.onclick=()=>{if(!ans){fb($('[data-fb]',box),false,'먼저 ▶ 음악 듣기를 눌러요.');return}
+        if(b.dataset.k===ans){b.classList.add('ok');chime();plus();const g=ans==='f'?'정답! 세게, 포르테! 트레팍은 대부분 세게 연주해요.':'정답! 여리게, 피아노!';fb($('[data-fb]',box),true,g+' 다시 ▶를 눌러 다음 문제!');say(g);ans=null;Groove.stop()}
+        else{b.classList.add('no','shake');buzz();fb($('[data-fb]',box),false,'다시 들어 볼까요?')}});
+    },
+    rhy(){
+      const opts=shuffle(RHY).slice(0,3);const ans=opts[Math.floor(Math.random()*3)];let played=false;
+      box.innerHTML=`<p class="qtext">탬버린 리듬을 듣고, 같은 그림 악보를 골라요</p><div class="row" style="justify-content:center"><button class="btn primary big" id="rPlay" type="button">▶ 리듬 듣기</button><button class="btn big" id="rNew" type="button">↻ 새 문제</button></div>
+      <div class="opts">${opts.map((p,i)=>`<button class="btn opt rhy-opt" data-i="${i}" type="button">${rhyHTML(p)}</button>`).join('')}</div><p class="feedback" data-fb></p>
+      <div class="row" style="justify-content:center;margin-top:10px"><div class="tamb" id="tambPad" role="button" tabindex="0" aria-label="탬버린">탬버린<br>치기</div><p class="muted" style="max-width:30ch">맞혔으면 탬버린을 눌러 직접 따라 쳐 봐요!</p></div>`;
+      $('#rPlay').onclick=()=>{played=true;playRhy(ans)};$('#rNew').onclick=tabs.rhy;
+      const pad=$('#tambPad');const hit=()=>{tamb(ac().currentTime,1.2);pad.classList.remove('hit');void pad.offsetWidth;pad.classList.add('hit')};pad.onpointerdown=hit;pad.onkeydown=e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();hit()}};
+      let solved=false;
+      $$('.opt',box).forEach(b=>b.onclick=()=>{if(!played){fb($('[data-fb]',box),false,'먼저 ▶ 리듬 듣기를 눌러요.');return}if(solved)return;
+        if(opts[+b.dataset.i]===ans){solved=true;b.classList.add('ok');chime();plus();fb($('[data-fb]',box),true,'정답! ↻ 새 문제를 눌러 계속해요.');say('정답!');later(()=>playRhy(ans),700)}
+        else{b.classList.add('no','shake');buzz();fb($('[data-fb]',box),false,'다시 들어 볼까요?')}});
+    },
+    cond(){
+      const tname=b=>b<80?'느리게 (Adagio)':b<120?'보통 빠르게 (Moderato)':b<160?'빠르게 (Allegro)':'매우 빠르게 (Vivace)';
+      const dname=v=>v<.2?'pp':v<.4?'p':v<.6?'mp':v<.8?'mf':v<1?'f':'ff';
+      const dko={pp:'아주 여리게',p:'여리게',mp:'조금 여리게',mf:'조금 세게',f:'세게',ff:'아주 세게'};
+      box.innerHTML=`<p class="qtext">지휘자가 되어 빠르기와 셈여림을 바꿔 봐요</p>
+      <div class="beatdots" style="margin:6px 0"><i></i><i></i></div>
+      <div class="grid two">
+        <div class="slider"><label for="bpmR" style="font-weight:700">⏱️ 빠르기: <span id="bpmL"></span></label><input id="bpmR" type="range" min="50" max="220" value="100"><span class="muted">🐢 느리게 ←→ 빠르게 🏃</span></div>
+        <div class="slider"><label for="volR" style="font-weight:700">🔊 셈여림: <span class="dyn" id="dynL">mf</span> <span id="dynK"></span></label><input id="volR" type="range" min="5" max="120" value="65"><span class="muted">여리게 ←→ 세게</span></div>
+      </div>
+      <div class="row" style="justify-content:center"><button class="btn primary big" id="cPlay" type="button">▶ 연주 시작</button><button class="btn big" id="cTrepak" type="button">🇷🇺 트레팍처럼!</button><button class="btn red big" id="cAccel" type="button">🚀 점점 빠르게 (코다)</button><button class="btn big" id="cStop" type="button">■ 멈춤</button></div>
+      <p class="feedback good" id="cFb"></p>`;
+      const bpmR=$('#bpmR'),volR=$('#volR');
+      const upd=()=>{Groove.bpm=+bpmR.value;$('#bpmL').textContent=`${bpmR.value} · ${tname(+bpmR.value)}`;const v=volR.value/100;Groove.setVol(v);const d=dname(v);$('#dynL').textContent=d;$('#dynK').textContent=dko[d]};
+      bpmR.oninput=()=>{Groove.accel=false;upd()};volR.oninput=upd;upd();
+      Groove.onBeat=n=>{const d=$$('#mBox .beatdots i');d.forEach(x=>x.classList.remove('hit'));if(d[n])d[n].classList.add('hit')};
+      Groove.onTempo=b=>{bpmR.value=b;$('#bpmL').textContent=`${b} · ${tname(b)}`};
+      $('#cPlay').onclick=()=>{Groove.vol=volR.value/100;Groove.bpm=+bpmR.value;Groove.start();$('#cFb').textContent=''};
+      $('#cStop').onclick=()=>Groove.stop();
+      $('#cTrepak').onclick=()=>{bpmR.value=168;volR.value=100;Groove.accel=false;upd();Groove.vol=1;Groove.start();$('#cFb').textContent='트레팍은 매우 빠르고 세게! 탬버린 소리에 맞춰 몸을 흔들어요.';say('트레팍은 매우 빠르고 세게!')};
+      $('#cAccel').onclick=()=>{if(!Groove.playing){Groove.vol=volR.value/100;Groove.start()}Groove.accel=true;$('#cFb').textContent='트레팍의 마지막 부분(코다)처럼 점점 빠르게! 이걸 "아첼레란도"라고 해요.';say('트레팍의 마지막 부분처럼 점점 빠르게! 아첼레란도!')};
+    }
+  };
+  $$('[data-tab]',m).forEach(b=>b.onclick=()=>{Groove.stop();Groove.onBeat=null;Groove.onTempo=null;clearTimers();$$('[data-tab]',m).forEach(x=>x.classList.toggle('sel',x===b));tabs[b.dataset.tab]()});
+  tabs.tempo();
+}
+
+/* ===== 8. 볼쇼이 극장 ===== */
+function renderFinal(m,st){
+  m.innerHTML=head(st,'오늘 배운 것을 퀴즈로 확인하고, 볼쇼이 극장 입장권을 받아요!')+`<div class="card"><div id="fq" class="qbox"></div></div>`;
+  const Q=[
+    {q:'러시아의 수도는 어디일까요?',opts:[['🏛️ 모스크바',1],['🗼 파리',0],['🏯 서울',0]]},
+    {q:'러시아는 대한민국의 어느 쪽에 있을까요?',opts:[['▲ 북쪽',1],['▼ 남쪽',0]]},
+    {q:'모스크바 겨울 여행에 꼭 필요한 것은?',opts:[['<span class="ic">🧤</span>장갑',1],['<span class="ic">🩳</span>반바지',0],['<span class="ic">🩴</span>슬리퍼',0]]},
+    {q:'인형 안에 더 작은 인형이 들어 있는 러시아 인형은?',opts:[[dollSVG('fq','#c8404d',.4)+'마트료시카',1],['<span class="ic">🧸</span>곰 인형',0]]},
+    {q:'러시아 말로 "고마워요"는?',opts:[['스파시바',1],['프리비엣',0],['니엣',0]]},
+    {q:'「호두까기 인형」을 작곡한 사람은?',opts:[['차이콥스키',1],['베토벤',0],['모차르트',0]]},
+    {q:'트레팍의 빠르기는?',opts:[['<span class="ic">🏃</span>매우 빠르게',1],['<span class="ic">🐢</span>아주 느리게',0]]},
+    {q:'발끝으로 설 수 있게 만든 발레 신발은?',opts:[['<span class="ic">🩰</span>토슈즈',1],['<span class="ic">🥾</span>털부츠',0]]}
+  ];
+  quiz($('#fq'),Q.map(q=>({q:q.q,opts:shuffle(q.opts).map(([h,ok])=>({h,ok:!!ok}))})),score=>{
+    award('bolshoi');
+    later(()=>showTicket(m,score),2200);
+    return `8문제 중 ${score}개 정답! 입장권을 준비하고 있어요…`;
+  });
+}
+function showTicket(m,score){
+  const n=STATIONS.filter(s=>stamps[s.id]).length;const d=new Date();
+  const date=`${d.getFullYear()}. ${d.getMonth()+1}. ${d.getDate()}.`;
+  m.querySelector('.card').innerHTML=`<div class="final-ticket">
+    <div class="l"><span class="ru">БИЛЕТ · БОЛЬШОЙ ТЕАТР</span><h3>볼쇼이 극장 입장권</h3>
+      <p>공연: 발레 「호두까기 인형」 2막 · 트레팍(러시아의 춤)</p><p>작곡: 차이콥스키</p>
+      <label for="tName" style="font-weight:700;margin-top:6px">입장객 이름</label><input id="tName" placeholder="이름을 써요" autocomplete="off">
+      <p style="margin-top:6px">날짜: ${date} · 퀴즈 ${score}/8 · 도장 ${n}/8</p></div>
+    <div class="r"><div class="seal">참 잘<br>했어요</div><small>좌석: 1층 맨 앞줄</small><span style="font-size:1.6rem">🩰🎄🪆</span></div>
+  </div><p class="muted" style="text-align:center;margin-top:12px">이름을 쓰고 화면을 캡처해서 친구들에게 보여 주세요. 다음 시간에 진짜 트레팍 공연 영상을 볼 거예요!</p>
+  <div class="row" style="justify-content:center"><button class="btn red big" data-video="bolshoi" type="button">▶ 볼쇼이 극장 영상관</button></div>`;
+  confetti();say('볼쇼이 극장 입장권을 받았어요! 이름을 써 보세요.');
+}
+
+/* ---------- 시작 ---------- */
+const startId=(location.hash||'').slice(1);
+go(Math.max(0,STATIONS.findIndex(s=>s.id===startId)));
+</script>
+</body>
+</html>
